@@ -1,6 +1,7 @@
 import create_archives
 import feeds
-from config import site_config, BASE_DIR, OUTPUT, ALLOWED_SLUG_CHARS
+from config import BASE_DIR, OUTPUT, ALLOWED_SLUG_CHARS
+import config
 import frontmatter
 import datetime
 import markdown
@@ -21,7 +22,7 @@ if not os.path.exists("_site"):
 
 posts = sorted(os.listdir("_posts"), key=lambda s: "".join([char for char in s if char.isnumeric()]))
 
-def create_non_post_files(all_directories, is_retro):
+def create_non_post_files(all_directories, is_retro, pages_created_count, site_config):
     do_not_process = ("_posts", "_layouts", "_site", "assets", "_includes")
 
     for directory in all_directories:
@@ -45,9 +46,13 @@ def create_non_post_files(all_directories, is_retro):
                 continue
 
             if extension == "md" or extension == "html":
-                process_page(directory_name, f, None, None, is_retro)
+                site_config = process_page(directory_name, f, site_config, None, None, is_retro)
             else:
                 shutil.copy(f, OUTPUT + "/" + file_name)
+
+            pages_created_count += 1
+
+    return site_config, pages_created_count
 
 def create_template(path, **kwargs):
     template_front_matter = frontmatter.load(path)
@@ -77,7 +82,7 @@ def create_template(path, **kwargs):
     
     return template
 
-def process_page(directory_name, file_name, page_type=None, previous_page=None, is_retro=False, next_post=None, next_post_url=None):
+def process_page(directory_name, file_name, site_config, page_type=None, previous_page=None, is_retro=False, next_post=None, next_post_url=None):
     front_matter = frontmatter.load(file_name)
     
     if previous_page:
@@ -113,7 +118,10 @@ def process_page(directory_name, file_name, page_type=None, previous_page=None, 
         ("Like", "likes"),
         ("Bookmark", "bookmarks"),
         ("Webmention", "replies"),
+        ("Reply", "replies"),
         ("Repost", "reposts"),
+        ("RSVP", "rsvps"),
+        ("Drinking", "coffee"),
     )
 
     for g in groups:
@@ -166,6 +174,8 @@ def process_page(directory_name, file_name, page_type=None, previous_page=None, 
     with open(path_to_save, "w+") as file:
         file.write(rendered_string)
 
+    site_config["pages"] = site_config["pages"] + [front_matter.metadata["url"]]
+
     if page_type == "post":
         site_config["posts"] = site_config["posts"] + [front_matter.metadata]
 
@@ -175,7 +185,9 @@ def process_page(directory_name, file_name, page_type=None, previous_page=None, 
             else:
                 site_config["categories"][category] = site_config["categories"][category] + [front_matter.metadata]
 
-def create_posts(is_retro):
+    return site_config
+
+def create_posts(is_retro, pages_created_count, site_config):
     post_files = posts
 
     previous_page = None
@@ -197,34 +209,54 @@ def create_posts(is_retro):
             next_post_url = None
             next_post = None
 
-        process_page(post_directory, f, "post", previous_page, is_retro, next_post, next_post_url)
+        site_config = process_page(post_directory, f, site_config, "post", previous_page, is_retro, next_post, next_post_url)
 
         previous_page = f
 
+        pages_created_count += 1
+
+    return site_config, pages_created_count
+
 def main(is_retro):
-    create_posts(is_retro)
+    pages_created_count = 0
+
+    site_config = config.site_config
+
+    site_config, pages_created_count = create_posts(is_retro, pages_created_count, site_config)
 
     # get all directories in folder
     all_directories = os.listdir(BASE_DIR)
 
     site_config["posts"].reverse()
 
-    create_non_post_files(all_directories, is_retro)
+    site_config, pages_created_count = create_non_post_files(all_directories, is_retro, pages_created_count, site_config)
 
     os.mkdir("_site/category")
 
-    create_archives.create_category_pages(site_config, BASE_DIR, OUTPUT)
+    site_config, pages_created_count = create_archives.create_category_pages(site_config, BASE_DIR, OUTPUT, pages_created_count)
 
-    create_archives.create_pagination_pages(site_config, OUTPUT)
+    site_config, pages_created_count = create_archives.create_pagination_pages(site_config, OUTPUT, pages_created_count)
 
-    create_archives.create_date_archive_pages(site_config, OUTPUT)
+    print(site_config["posts"])
+    site_config, pages_created_count = create_archives.create_date_archive_pages(site_config, OUTPUT, pages_created_count)
 
-    create_archives.create_list_pages(BASE_DIR, site_config, OUTPUT)
+    site_config, pages_created_count = create_archives.create_list_pages(BASE_DIR, site_config, OUTPUT, pages_created_count)
 
-    feeds.create_feeds(site_config)
+    site_config = create_archives.generate_sitemap(site_config, OUTPUT)
+
+    # feeds.create_feeds(site_config)
 
     if os.path.exists("assets"):
         shutil.copytree("assets", "_site/assets")
+
+    print("Pages generated: " + str(pages_created_count))
+
+    per_second = str(pages_created_count / (datetime.datetime.now() - start_time).total_seconds())
+
+    # round to 2 dp
+    per_second = round(float(per_second), 2)
+
+    print("Pages generated per second: " + per_second)
 
 def slugify(post_path):
     return "".join([char for char in post_path.replace(" ", "-") if char.isalnum() or char in ALLOWED_SLUG_CHARS]).replace(".md", ".html")

@@ -1,6 +1,7 @@
 from feedgen.feed import FeedGenerator
 from app import create_template
 import frontmatter
+import datetime
 import jinja2
 import os
 
@@ -15,7 +16,7 @@ def date_to_xml_string(date):
 def slugify(post_path):
     return "".join([char for char in post_path.replace(" ", "-") if char.isalnum() or char in allowed_slug_chars]).replace(".md", ".html")
 
-def create_pagination_pages(site_config, output):
+def create_pagination_pages(site_config, output, pages_created_count):
     for category, entries in site_config["categories"].items():
         number_of_pages = int(len(entries) / 10) + 1
 
@@ -37,7 +38,11 @@ def create_pagination_pages(site_config, output):
             with open(slugify(path_to_save), "w+") as file:
                 file.write(template)
 
-def create_category_pages(site_config, base_dir, output):
+            pages_created_count += 1
+
+    return site_config, pages_created_count
+
+def create_category_pages(site_config, base_dir, output, pages_created_count):
     for category, entries in site_config["categories"].items():
         entries.reverse()
         front_matter = frontmatter.load("_layouts/category.html")
@@ -113,10 +118,12 @@ def create_category_pages(site_config, base_dir, output):
                 with open(slugify(output + "/category/" + category) + "/index.html", "w+") as file:
                     file.write(main_page_content)
 
-def create_list_pages(base_dir, site_config, output):
-    list_pages = ["likes", "bookmarks", "replies"]
+            pages_created_count += 1
 
-    loader = jinja2.FileSystemLoader(searchpath="./")
+    return site_config, pages_created_count
+
+def create_list_pages(base_dir, site_config, output, pages_created_count):
+    list_pages = ["likes", "bookmarks", "replies", "rsvps", "coffee"]
     
     for page in list_pages:
         number_of_pages = int(len(site_config[page]) / 10) + 1
@@ -151,18 +158,24 @@ def create_list_pages(base_dir, site_config, output):
                 with open(output + "/" + page + "/index.html", "w+") as file:
                     file.write(template)
 
-def create_date_archive_pages(site_config, output):
+            pages_created_count += 1
+
+    return site_config, pages_created_count
+
+def create_date_archive_pages(site_config, output, pages_created_count):
     posts_by_date = {}
 
-    print('sdsdsd' * 25)
-    print(posts_by_date.items())
+    print('test')
 
     for post in site_config["posts"]:
-        date = post["slug"].split("/")[-1].split("-")
-        year = date[0]
-        month = date[1]
+        print(post)
+        print(len(site_config["posts"]))
+        date = post["url"].split("/")
 
-        print(year)
+        year = date[1]
+        month = date[2]
+
+        date = "{}/{}".format(year, month)
 
         if posts_by_date.get("{}-{}".format(year, month)) == None:
             posts_by_date["{}-{}".format(year, month)] = [post]
@@ -174,6 +187,8 @@ def create_date_archive_pages(site_config, output):
 
         print("Generating {} Archive Page".format(date))
 
+        pages_created_count += 1
+
         date = date.split("/")[-1].replace("-", "/").lower()
 
         if not os.path.exists(output + "/" + date):
@@ -181,3 +196,13 @@ def create_date_archive_pages(site_config, output):
 
         with open(slugify(output + "/" + date + "/index.html"), "w+") as file:
             file.write(rendered_string)
+    
+    return site_config, pages_created_count
+
+def generate_sitemap(site_config, output):
+    lastmod = datetime.datetime.now().strftime("%Y-%m-%d")
+
+    sitemap = create_template("templates/sitemap.xml", pages=site_config["pages"], lastmod=lastmod)
+
+    with open(slugify(output + "/sitemap.xml"), "w+") as file:
+        file.write(sitemap)

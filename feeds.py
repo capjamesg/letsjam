@@ -3,38 +3,37 @@ import json
 import os
 
 def create_feeds(site_config):
-    feeds = [
-        "bookmarks.jf2",
-        "likes.jf2",
-        "replies.jf2",
-        "bookmarks.json",
-        "likes.json",
-        "replies.json",
-        "bookmarks.xml",
-        "likes.xml",
-        "replies.xml"
-    ]
+    feeds = (
+        ("bookmarks.jf2", "James' Coffee Blog - Bookmarks", "bookmarks"),
+        ("likes.jf2", "James' Coffee Blog - Likes", "likes"),
+        ("replies.jf2", "James' Coffee Blog - Replies", "replies"),
+        ("bookmarks.json", "James' Coffee Blog - Bookmarks", "bookmarks"),
+        ("likes.json", "James' Coffee Blog - Likes", "likes"),
+        ("replies.json", "James' Coffee Blog - Replies", "replies"),
+        ("bookmarks.xml", "James' Coffee Blog - Bookmarks", "bookmarks"),
+        ("likes.xml", "James' Coffee Blog - Likes", "likes"),
+        ("replies.xml", "James' Coffee Blog - Replies", "replies"),
+        ("posts.jf2", "James' Coffee Blog - Posts", "posts"),
+        ("posts.json", "James' Coffee Blog - Posts", "posts"),
+        ("posts.xml", "James' Coffee Blog - Posts", "posts")
+    )
 
     os.makedirs("_site/feeds")
 
-    for f in feeds:
-        print("Creating feed: " + f)
-        
-        if f.endswith(".jf2"):
+    for feed_name, feed_title, group in feeds:
+        print("Creating feed: " + feed_name)
+
+        if feed_name.endswith(".jf2"):
             full_jf2_feed = {
                 "type": "feed",
                 "items": []
             }
-            for post in site_config["posts"][:-10]:
+            for post in site_config[group][:-10]:
                 entry = {
                     "type": "entry",
                     "name": post["title"],
                     "url": post["url"],
-                    "image": post["image"],
-                    "category": post["category"],
-                    "content": {
-                        "text": post["content"]
-                    },
+                    "category": post["categories"],
                     "author": {
                         "url": "https://jamesg.blog",
                         "name": "James' Coffee Blog",
@@ -42,15 +41,24 @@ def create_feeds(site_config):
                     },
                     "post-type": "post"
                 }
+
+                if post.get("image"):
+                    entry["image"] = post["image"]
+
+                if post.get("content"):
+                    entry["content"] = {
+                        "text": post["content"]
+                    }
+
                 full_jf2_feed["items"].append(entry)
 
-            with open("_site/feeds/" + f.replace(".jf2", ".xml"), "w+") as file:
+            with open("_site/feeds/" + feed_name, "w+") as file:
                 file.write(json.dumps(full_jf2_feed))
 
-        elif f.endswith(".json"):
+        elif feed_name.endswith(".json"):
             full_json_feed = {
                 "feed_url": "https://jamesg.blog/posts.json",
-                "title": "James' Coffee Blog",
+                "title": feed_title,
                 "home_page_url": "https://jamesg.blog",
                 "author": {
                     "url": "https://jamesg.blog",
@@ -59,35 +67,38 @@ def create_feeds(site_config):
                 "version": "https://jsonfeed.org/version/1",
                 "items": []
             }
-            for post in site_config["posts"][:-10]:
+            for post in site_config[group][:-10]:
                 entry = {
                     "title": post["title"],
                     "url": post["url"],
                     "id": post["url"],
-                    "image": post["image"],
                     "author": {
                         "url": "https://jamesg.blog",
                         "name": "James' Coffee Blog"
                     }
                 }
+                
+                if post.get("image"):
+                    entry["image"] = post["image"]
+
                 full_json_feed["items"].append(entry)
 
-            with open("_site/feeds/" + f.replace(".json", ".xml"), "w+") as file:
+            with open("_site/feeds/" + feed_name, "w+") as file:
                 file.write(json.dumps(full_json_feed))
 
-        elif f.endswith(".xml"):
+        elif feed_name.endswith(".xml"):
             fg = FeedGenerator()
             
             fg.id("https://jamesg.blog")
-            fg.title("James'Coffee Blog")
-            fg.author(name="James' Coffee Blog")
+            fg.title(feed_title)
+            fg.author(name=feed_title)
             fg.link(href="https://jamesg.blog", rel="self")
             fg.logo("https://jamesg.blog/favicon.ico")
-            fg.subtitle("James' Coffee Blog")
-            fg.description("James' Coffee Blog")
+            fg.subtitle(feed_title)
+            fg.description(feed_title)
             fg.language("en")
 
-            for post in site_config["posts"][:-10]:
+            for post in site_config[group][:-10]:
                 fe = fg.add_entry()
 
                 fe.id(post["url"])
@@ -95,9 +106,11 @@ def create_feeds(site_config):
                 fe.link(href=post["url"])
                 fe.description(post["excerpt"])
                 fe.author(name="James' Coffee Blog")
-                fe.enclosure(post["image"], 0, "image/jpeg")
+                
+                if post.get("image"):
+                    fe.enclosure(post["image"], 0, "image/jpeg")
 
-            with open("_site/feeds/" + f, "w+") as file:
+            with open("_site/feeds/" + feed_name, "w+") as file:
                 feed_to_save = str(fg.rss_str(pretty=True))
 
                 file.write(feed_to_save)

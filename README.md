@@ -1,4 +1,4 @@
-## letsjam
+# letsjam
 
 letsjam is a static site generator built with Python and jinja2.
 
@@ -58,6 +58,8 @@ If you have blog posts, please move them to a folder called _posts.
 To run the static site generator, use this command:
 
     python3 app.py
+
+All files generated are placed in a _site directory. This directory is purged on each generation.
 
 ### letsjam Server
 
