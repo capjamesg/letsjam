@@ -177,8 +177,6 @@ def create_date_archive_pages(site_config, output, pages_created_count, posts):
         year = date[1].strip()
         month = date[2].strip()
 
-        print(year, month)
-
         if not year.isdigit() or not month.isdigit():
             continue
 
@@ -195,7 +193,7 @@ def create_date_archive_pages(site_config, output, pages_created_count, posts):
             posts_by_year[year] = posts_by_year[year] + [post]
 
     for date, entries in posts_by_date.items():
-        rendered_string = create_template("_layouts/category.html", site=site_config, category=date, page={"title": "Entries for {}".format(date), "posts": entries}, paginator=None)
+        rendered_string = create_template("_layouts/date_archive.html", site=site_config, category=date, page={"title": "Entries for {}".format(date), "date": date, "posts": entries}, paginator=None)
 
         print("Generating {} Archive Page".format(date))
 
@@ -210,7 +208,7 @@ def create_date_archive_pages(site_config, output, pages_created_count, posts):
             file.write(rendered_string)
 
     for date, entries in posts_by_year.items():
-        rendered_string = create_template("_layouts/category.html", site=site_config, category=date, page={"title": "Entries for {}".format(date), "posts": entries}, paginator=None)
+        rendered_string = create_template("_layouts/date_archive.html", site=site_config, category=date, page={"title": "Entries for {}".format(date), "date": date, "posts": entries}, paginator=None)
 
         print("Generating {} Archive Page".format(date))
 
@@ -222,6 +220,30 @@ def create_date_archive_pages(site_config, output, pages_created_count, posts):
             os.makedirs(output + "/" + date)
 
         with open(slugify(output + "/" + date + "/index.html"), "w+") as file:
+            file.write(rendered_string)
+
+    archive_object = {
+        "years": {}
+    }
+
+    for item in posts_by_date.keys():
+        year = item.split("-")[0]
+        month = item.split("-")[1]
+
+        if archive_object["years"].get(year) == None:
+            archive_object["years"][year] = [month]
+        else:
+            archive_object["years"][year] = archive_object["years"][year] + [month]
+
+    print("Generating Archive Page at /archive/")
+
+    if os.path.exists("templates/archive.html"):
+        rendered_string = create_template("templates/archive.html", site=site_config, page={"years": archive_object["years"]}, paginator=None)
+
+        if not os.path.exists(output + "/archive"):
+            os.makedirs(output + "/archive")
+                
+        with open(slugify(output + "/archive" + "/index.html"), "w+") as file:
             file.write(rendered_string)
 
     return site_config, pages_created_count

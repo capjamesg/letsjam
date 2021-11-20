@@ -42,11 +42,15 @@ def create_non_post_files(all_directories, is_retro, pages_created_count, site_c
             extension = file_name.split(".")[-1]
 
             # do not copy dotfiles into site
+            # also do not create archive.html file as that is created later
+
             if file_name.startswith("."):
+                continue
+            elif file_name == "/archive.html":
                 continue
 
             if extension == "md" or extension == "html":
-                site_config = process_page(directory_name, f, site_config, None, None, is_retro)
+                process_page(directory_name, f, site_config, None, None, is_retro)
             else:
                 shutil.copy(f, OUTPUT + "/" + file_name)
 
@@ -71,12 +75,14 @@ def create_template(path, **kwargs):
         parent_front_matter = frontmatter.load("_layouts/" + template_front_matter.metadata["layout"] + ".html")
         parent_template = template.from_string(parent_front_matter.content)
 
-        kwargs["content"] = new_template.render(**kwargs)
+        new_template = parent_template.render(content=new_template.render(kwargs), **kwargs)
 
-        template = parent_template.render(kwargs)
+        kwargs["content"] = new_template
 
         if parent_front_matter.metadata.get("layout"):
-            parent_template = create_template("_layouts/" + parent_front_matter.metadata["layout"] + ".html", **kwargs)
+            template = create_template("_layouts/" + parent_front_matter.metadata["layout"] + ".html", **kwargs)
+        else:
+            template = new_template
     else:
         template = new_template.render(kwargs)
     
@@ -111,6 +117,10 @@ def process_page(directory_name, file_name, site_config, page_type=None, previou
     if front_matter.metadata == {}:
         return
 
+    # do not process pages with no content
+    if len(front_matter.content) == 0:
+        return
+
     if front_matter.metadata.get("categories") == None:
         front_matter.metadata["categories"] = []
 
@@ -136,7 +146,7 @@ def process_page(directory_name, file_name, site_config, page_type=None, previou
     front_matter.metadata["slug"] = slugify(file_name.replace(".html", ""))
     front_matter.metadata["url"] = front_matter.metadata["slug"]
 
-    if front_matter.metadata["layout"].rstrip("s") in ["like", "bookmark", "repost", "webmention", "note"]:
+    if front_matter.metadata["layout"].rstrip("s").lower() in ["like", "bookmark", "repost", "webmention", "note"]:
         site_config[front_matter.metadata["layout"].rstrip("s")] = site_config[front_matter.metadata["layout"].rstrip("s")] + [front_matter.metadata]
 
     print("Generating " + file_name)
@@ -177,10 +187,12 @@ def process_page(directory_name, file_name, site_config, page_type=None, previou
     with open(path_to_save, "w+") as file:
         file.write(rendered_string)
 
-    site_config["pages"] = site_config["pages"] + [front_matter.metadata["url"]]
+    if site_config and site_config.get("pages"):
+        site_config["pages"] = site_config["pages"] + [front_matter.metadata["url"]]
+    elif site_config:
+        site_config["pages"] = [front_matter.metadata["url"]]
 
     if page_type == "post":
-        print
         site_config["posts"] = site_config["posts"] + [front_matter.metadata]
 
         for category in front_matter.metadata["categories"]:
@@ -235,17 +247,17 @@ def main(is_retro):
 
     site_config["posts"].reverse()
 
-    # site_config, pages_created_count = create_non_post_files(all_directories, is_retro, pages_created_count, site_config)
+    site_config, pages_created_count = create_non_post_files(all_directories, is_retro, pages_created_count, site_config)
 
     os.mkdir("_site/category")
 
-    # site_config, pages_created_count = create_archives.create_category_pages(site_config, BASE_DIR, OUTPUT, pages_created_count)
+    site_config, pages_created_count = create_archives.create_category_pages(site_config, BASE_DIR, OUTPUT, pages_created_count)
 
-    # site_config, pages_created_count = create_archives.create_pagination_pages(site_config, OUTPUT, pages_created_count)
+    site_config, pages_created_count = create_archives.create_pagination_pages(site_config, OUTPUT, pages_created_count)
 
     site_config, pages_created_count = create_archives.create_date_archive_pages(site_config, OUTPUT, pages_created_count, posts)
 
-    # site_config, pages_created_count = create_archives.create_list_pages(BASE_DIR, site_config, OUTPUT, pages_created_count)
+    site_config, pages_created_count = create_archives.create_list_pages(BASE_DIR, site_config, OUTPUT, pages_created_count)
 
     site_config = create_archives.generate_sitemap(site_config, OUTPUT)
 
