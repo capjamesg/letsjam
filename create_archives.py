@@ -137,7 +137,9 @@ def create_list_pages(base_dir, site_config, output, pages_created_count):
                 "next_page_path": "/" + page + "/" + str(increment + 1) + ".html"
             }
 
-            template = create_template(base_dir + "/templates/" + page + ".html", page={}, site=site_config, paginator=paginator)
+            posts = site_config[page][increment * 10:increment * 10 + 10]
+
+            template = create_template(base_dir + "/templates/" + page + ".html", page={"posts": posts}, site=site_config, paginator=paginator)
 
             print("Generating {} List Page".format(page))
 
@@ -162,18 +164,23 @@ def create_list_pages(base_dir, site_config, output, pages_created_count):
 
     return site_config, pages_created_count
 
-def create_date_archive_pages(site_config, output, pages_created_count):
+def create_date_archive_pages(site_config, output, pages_created_count, posts):
     posts_by_date = {}
+    posts_by_year = {}
 
-    print('test')
-
-    for post in site_config["posts"]:
-        print(post)
-        print(len(site_config["posts"]))
+    for post in posts:
         date = post["url"].split("/")
 
-        year = date[1]
-        month = date[2]
+        if len(date) < 3:
+            continue
+
+        year = date[1].strip()
+        month = date[2].strip()
+
+        print(year, month)
+
+        if not year.isdigit() or not month.isdigit():
+            continue
 
         date = "{}/{}".format(year, month)
 
@@ -181,6 +188,11 @@ def create_date_archive_pages(site_config, output, pages_created_count):
             posts_by_date["{}-{}".format(year, month)] = [post]
         else:
             posts_by_date["{}-{}".format(year, month)] = posts_by_date["{}-{}".format(year, month)] + [post]
+
+        if posts_by_year.get(year) == None:
+            posts_by_year[year] = [post]
+        else:
+            posts_by_year[year] = posts_by_year[year] + [post]
 
     for date, entries in posts_by_date.items():
         rendered_string = create_template("_layouts/category.html", site=site_config, category=date, page={"title": "Entries for {}".format(date), "posts": entries}, paginator=None)
@@ -196,7 +208,22 @@ def create_date_archive_pages(site_config, output, pages_created_count):
 
         with open(slugify(output + "/" + date + "/index.html"), "w+") as file:
             file.write(rendered_string)
-    
+
+    for date, entries in posts_by_year.items():
+        rendered_string = create_template("_layouts/category.html", site=site_config, category=date, page={"title": "Entries for {}".format(date), "posts": entries}, paginator=None)
+
+        print("Generating {} Archive Page".format(date))
+
+        pages_created_count += 1
+
+        date = date.lower()
+
+        if not os.path.exists(output + "/" + date):
+            os.makedirs(output + "/" + date)
+
+        with open(slugify(output + "/" + date + "/index.html"), "w+") as file:
+            file.write(rendered_string)
+
     return site_config, pages_created_count
 
 def generate_sitemap(site_config, output):
