@@ -37,14 +37,14 @@ def generate_archive_page(increment, pages_created_count, template_path, entries
     increment = str(increment + 1)
 
     if int(increment) > 0:
-        if not os.path.exists(slugify(output + "/" + date + "/" + increment + "/")):
-            os.makedirs(slugify(output + "/" + date + "/" + increment + "/"))
+        if not os.path.exists(slugify(output + "/archive/" + date + "/" + increment + "/")):
+            os.makedirs(slugify(output + "/archive/" + date + "/" + increment + "/"))
 
-        with open(slugify(output + "/" + date + "/" + increment + "/index.html"), "w+") as file:
+        with open(slugify(output + "/archive/" + date + "/" + increment + "/index.html"), "w+") as file:
             file.write(rendered_string)
     else:
-        if not os.path.exists(slugify(output + "/" + date + "/")):
-            os.makedirs(slugify(output + "/" + date + "/"))
+        if not os.path.exists(slugify(output + "/archive/" + date + "/")):
+            os.makedirs(slugify(output + "/archive/" + date + "/"))
 
         with open(output + "/" + date + "/index.html", "w+") as file:
             file.write(rendered_string)
@@ -181,7 +181,7 @@ def create_list_pages(base_dir, site_config, output, pages_created_count):
 
             posts = site_config[page][increment * 10:increment * 10 + 10]
 
-            template = create_template(base_dir + "/templates/" + page + ".html", page={"posts": posts}, site=site_config, paginator=paginator)
+            template = create_template(base_dir + "/templates/" + page + ".html", page={"posts": posts, "title": page.title()}, site=site_config, paginator=paginator)
 
             print("Generating {} List Page".format(page))
 
@@ -237,8 +237,10 @@ def create_date_archive_pages(site_config, output, pages_created_count, posts):
         entry_count = len(entries)
         number_of_pages = int(entry_count / 10) + 1
 
+        date = date.replace("-", "/")
+
         for increment in range(0, number_of_pages):
-            pages_created_count = generate_archive_page(increment, pages_created_count, "_layouts/date_archive.html", entries, number_of_pages, date, site_config, output, "/" + date + "/" + str(increment - 1))
+            pages_created_count = generate_archive_page(increment, pages_created_count, "_layouts/date_archive.html", entries, number_of_pages, date, site_config, output, "/archive/" + date + "/" + str(increment - 1))
 
     for date, entries in posts_by_year.items():
         # create different pages
@@ -246,7 +248,7 @@ def create_date_archive_pages(site_config, output, pages_created_count, posts):
         number_of_pages = int(entry_count / 10) + 1
 
         for increment in range(0, number_of_pages):
-            pages_created_count = generate_archive_page(increment, pages_created_count, "_layouts/date_archive.html", entries, number_of_pages, date, site_config, output, "/" + date + "/" + str(increment - 1))
+            pages_created_count = generate_archive_page(increment, pages_created_count, "_layouts/date_archive.html", entries, number_of_pages, date, site_config, output, "/archive/" + date + "/" + str(increment - 1))
 
     archive_object = {
         "years": {}
