@@ -163,6 +163,9 @@ def process_page(directory_name, file_name, site_config, page_type=None, previou
         path_to_save = OUTPUT + "/" + year + "/" + month + "/" + day + "/" + "-".join(file.split("-")[3:]).split(".")[0] + ".html"
     else:
         path_to_save = OUTPUT + "/" + file_name.replace(BASE_DIR, "").strip("/").replace("templates/", "").replace("_", "")
+
+    if front_matter.get("permalink"):
+        path_to_save = OUTPUT + front_matter.get("permalink").rstrip("/") + ".html"
         
     front_matter.metadata["url"] = path_to_save.replace(OUTPUT, "")
 
@@ -177,6 +180,7 @@ def process_page(directory_name, file_name, site_config, page_type=None, previou
     site_config["pages"] = site_config["pages"] + [front_matter.metadata["url"]]
 
     if page_type == "post":
+        print
         site_config["posts"] = site_config["posts"] + [front_matter.metadata]
 
         for category in front_matter.metadata["categories"]:
@@ -224,23 +228,24 @@ def main(is_retro):
 
     site_config, pages_created_count = create_posts(is_retro, pages_created_count, site_config)
 
+    posts = site_config["posts"]
+
     # get all directories in folder
     all_directories = os.listdir(BASE_DIR)
 
     site_config["posts"].reverse()
 
-    site_config, pages_created_count = create_non_post_files(all_directories, is_retro, pages_created_count, site_config)
+    # site_config, pages_created_count = create_non_post_files(all_directories, is_retro, pages_created_count, site_config)
 
     os.mkdir("_site/category")
 
-    site_config, pages_created_count = create_archives.create_category_pages(site_config, BASE_DIR, OUTPUT, pages_created_count)
+    # site_config, pages_created_count = create_archives.create_category_pages(site_config, BASE_DIR, OUTPUT, pages_created_count)
 
-    site_config, pages_created_count = create_archives.create_pagination_pages(site_config, OUTPUT, pages_created_count)
+    # site_config, pages_created_count = create_archives.create_pagination_pages(site_config, OUTPUT, pages_created_count)
 
-    print(site_config["posts"])
-    site_config, pages_created_count = create_archives.create_date_archive_pages(site_config, OUTPUT, pages_created_count)
+    site_config, pages_created_count = create_archives.create_date_archive_pages(site_config, OUTPUT, pages_created_count, posts)
 
-    site_config, pages_created_count = create_archives.create_list_pages(BASE_DIR, site_config, OUTPUT, pages_created_count)
+    # site_config, pages_created_count = create_archives.create_list_pages(BASE_DIR, site_config, OUTPUT, pages_created_count)
 
     site_config = create_archives.generate_sitemap(site_config, OUTPUT)
 
@@ -253,10 +258,10 @@ def main(is_retro):
 
     per_second = str(pages_created_count / (datetime.datetime.now() - start_time).total_seconds())
 
-    # round to 2 dp
+    # round to 2 decimal places
     per_second = round(float(per_second), 2)
 
-    print("Pages generated per second: " + per_second)
+    print("Pages generated per second: " + str(per_second))
 
 def slugify(post_path):
     return "".join([char for char in post_path.replace(" ", "-") if char.isalnum() or char in ALLOWED_SLUG_CHARS]).replace(".md", ".html")
