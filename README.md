@@ -71,6 +71,12 @@ This project comes with a barebones Flask server that you can use for developmen
 
 The server is not built for production use. Please do not use the server in production.
 
+## My Site
+
+My blog, jamesg.blog, runs on letsjam. Here is a screenshot of my site home page, generated with letsjam:
+
+![My website home page](/assets/screenshot.png)
+
 ## Technologies Used
 
 - Python 3
