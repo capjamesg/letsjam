@@ -76,6 +76,16 @@ def create_template(path, **kwargs):
 
     new_template = template.from_string(template_front_matter.content)
 
+    # if is_retro is a keyword arg
+    if "is_retro" in kwargs:
+        is_retro = kwargs["is_retro"]
+
+        if is_retro and is_retro == True \
+            and template_front_matter.metadata.get("layout") \
+                and template_front_matter.metadata["layout"] == "default":
+
+            template_front_matter.metadata["layout"] = "retro"
+
     if template_front_matter.metadata.get("layout"):
         parent_front_matter = frontmatter.load("_layouts/" + template_front_matter.metadata["layout"] + ".html")
         parent_template = template.from_string(parent_front_matter.content)
@@ -132,16 +142,16 @@ def process_page(directory_name, file_name, site_config, page_type=None, previou
     if file_name.endswith(".md"):
         front_matter.content = markdown.markdown(front_matter.content)
 
-    # first three sentences will be considered "excerpt" value
-
     soup = BeautifulSoup(front_matter.content, "html.parser")
 
     if soup.find_all("p") and len(soup.find_all("p")) > 2:
-        front_matter.metadata["excerpt"] = " ".join([sentence.text for sentence in soup.find_all("p")[:2]])
+        # first paragraph sentences will be considered "excerpt" value
+        front_matter.metadata["excerpt"] = " ".join([sentence.text for sentence in soup.find_all("p")[:1]])
 
         # use first sentence for meta description
         front_matter.metadata["meta_description"] = "".join(front_matter.metadata["excerpt"].split(". ")[0]) + "..."
     else:
+        # used as a fallback
         front_matter.metadata["excerpt"] = front_matter.content
 
     if front_matter.metadata["layout"].rstrip("s").lower() in ["like", "bookmark", "repost", "webmention", "note"]:
@@ -176,7 +186,7 @@ def process_page(directory_name, file_name, site_config, page_type=None, previou
     front_matter.metadata["url"] = path_to_save.replace(OUTPUT, "")
     front_matter.metadata["slug"] = front_matter.metadata["url"]
 
-    rendered_string = create_template(file_name, site=site_config, page=front_matter.metadata, paginator=None)
+    rendered_string = create_template(file_name, site=site_config, page=front_matter.metadata, paginator=None, is_retro=is_retro)
 
     dir_to_save = "/".join(path_to_save.split("/")[:-1])
 
@@ -279,9 +289,9 @@ def main(is_retro):
 
     site_config, pages_created_count = create_archives.create_list_pages(BASE_DIR, site_config, OUTPUT, pages_created_count)
 
-    site_config = create_archives.generate_sitemap(site_config, OUTPUT)
+    create_archives.generate_sitemap(site_config, OUTPUT)
 
-    # feeds.create_feeds(site_config)
+    feeds.create_feeds(site_config)
 
     if os.path.exists("assets"):
         shutil.copytree("assets", "_site/assets")

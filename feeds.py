@@ -6,13 +6,13 @@ def create_feeds(site_config):
     feeds = (
         ("bookmarks.jf2", "James' Coffee Blog - Bookmarks", "bookmarks"),
         ("likes.jf2", "James' Coffee Blog - Likes", "likes"),
-        ("replies.jf2", "James' Coffee Blog - Replies", "replies"),
+        ("replies.jf2", "James' Coffee Blog - Replies", "webmentions"),
         ("bookmarks.json", "James' Coffee Blog - Bookmarks", "bookmarks"),
         ("likes.json", "James' Coffee Blog - Likes", "likes"),
-        ("replies.json", "James' Coffee Blog - Replies", "replies"),
+        ("replies.json", "James' Coffee Blog - Replies", "webmentions"),
         ("bookmarks.xml", "James' Coffee Blog - Bookmarks", "bookmarks"),
         ("likes.xml", "James' Coffee Blog - Likes", "likes"),
-        ("replies.xml", "James' Coffee Blog - Replies", "replies"),
+        ("replies.xml", "James' Coffee Blog - Replies", "webmentions"),
         ("posts.jf2", "James' Coffee Blog - Posts", "posts"),
         ("posts.json", "James' Coffee Blog - Posts", "posts"),
         ("posts.xml", "James' Coffee Blog - Posts", "posts")
@@ -31,7 +31,6 @@ def create_feeds(site_config):
             for post in site_config[group][:-10]:
                 entry = {
                     "type": "entry",
-                    "name": post["title"],
                     "url": post["url"],
                     "category": post["categories"],
                     "author": {
@@ -44,6 +43,11 @@ def create_feeds(site_config):
 
                 if post.get("image"):
                     entry["image"] = post["image"]
+
+                if post.get("title"):
+                    entry["title"] = post["title"]
+                else:
+                    entry["title"] = post["url"]
 
                 if post.get("content"):
                     entry["content"] = {
@@ -69,7 +73,6 @@ def create_feeds(site_config):
             }
             for post in site_config[group][:-10]:
                 entry = {
-                    "title": post["title"],
                     "url": post["url"],
                     "id": post["url"],
                     "author": {
@@ -80,6 +83,11 @@ def create_feeds(site_config):
                 
                 if post.get("image"):
                     entry["image"] = post["image"]
+
+                if post.get("title"):
+                    entry["title"] = post["title"]
+                else:
+                    entry["title"] = post["url"]
 
                 full_json_feed["items"].append(entry)
 
@@ -102,7 +110,12 @@ def create_feeds(site_config):
                 fe = fg.add_entry()
 
                 fe.id(post["url"])
-                fe.title(post["title"])
+
+                if post.get("title"):
+                    fe.title(post["title"])
+                else:
+                    fe.title(post["url"])
+                    
                 fe.link(href=post["url"])
                 fe.description(post["excerpt"])
                 fe.author(name="James' Coffee Blog")

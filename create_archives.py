@@ -24,9 +24,13 @@ def generate_archive_page(increment, pages_created_count, template_path, entries
         "total_pages": number_of_pages,
         "previous_page": increment - 1,
         "next_page": increment + 1,
-        "previous_page_path": page_path_base + str(increment - 1),
         "next_page_path": page_path_base + str(increment + 1)
     }
+
+    if increment - 1 <= 0:
+        paginator["previous_page_path"] = page_path_base
+    else:
+        paginator["previous_page_path"] = page_path_base + str(increment - 1)
 
     posts = entries[increment * 10:increment * 10 + 10]
 
@@ -98,6 +102,11 @@ def create_category_pages(site_config, base_dir, output, pages_created_count):
                 "next_page_path": "/category/" + category.lower() + "/" + str(increment + 1) + ".html"
             }
 
+            if increment - 1 <= 0:
+                paginator["previous_page_path"] = "/category/" + category.lower() + "/"
+            else:
+                paginator["previous_page_path"] = "/category/" + category.lower() + "/" + str(increment - 1) + ".html"
+
             with open(base_dir + "/_layouts/" + template_name + ".html") as template_file:
                 template_string = template_file.read()
             
@@ -114,6 +123,7 @@ def create_category_pages(site_config, base_dir, output, pages_created_count):
             # register filter
             rendered_front_matter.filters["long_date"] = long_date
             rendered_front_matter.filters["date_to_xml_string"] = date_to_xml_string
+            rendered_front_matter.filters["archive_date"] = archive_date
 
             rendered_front_matter = rendered_front_matter.from_string(front_matter.content)\
                 .render(
@@ -128,6 +138,7 @@ def create_category_pages(site_config, base_dir, output, pages_created_count):
             # register filter
             main_page_content.filters["long_date"] = long_date
             main_page_content.filters["date_to_xml_string"] = date_to_xml_string
+            main_page_content.filters["archive_date"] = archive_date
 
             main_page_content = main_page_content.from_string(template_string)\
                 .render(
@@ -178,6 +189,11 @@ def create_list_pages(base_dir, site_config, output, pages_created_count):
                 "previous_page_path": "/" + page + "/" + str(increment - 1),
                 "next_page_path": "/" + page + "/" + str(increment + 1)
             }
+
+            if increment - 1 <= 0:
+                paginator["previous_page_path"] = "/" + page + "/"
+            else:
+                paginator["previous_page_path"] = "/" + page + "/" + str(increment - 1) + ".html"
 
             posts = site_config[page][increment * 10:increment * 10 + 10]
 
@@ -258,10 +274,12 @@ def create_date_archive_pages(site_config, output, pages_created_count, posts):
         year = item.split("-")[0]
         month = item.split("-")[1]
 
+        written_month = datetime.datetime.strptime(month, "%m").strftime("%B")
+
         if archive_object["years"].get(year) == None:
-            archive_object["years"][year] = [month]
+            archive_object["years"][year] = [written_month]
         else:
-            archive_object["years"][year] = archive_object["years"][year] + [month]
+            archive_object["years"][year] = archive_object["years"][year] + [written_month]
 
     print("Generating Archive Page at /archive/")
 
