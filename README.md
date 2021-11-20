@@ -75,7 +75,7 @@ The server is not built for production use. Please do not use the server in prod
 
 My blog, jamesg.blog, runs on letsjam. Here is a screenshot of my site home page, generated with letsjam:
 
-![My website home page](/assets/screenshot.png)
+![My website home page](screenshot.png)
 
 ## Technologies Used
 

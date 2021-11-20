@@ -1,5 +1,6 @@
 import create_archives
 import feeds
+from bs4 import BeautifulSoup
 from config import BASE_DIR, OUTPUT, ALLOWED_SLUG_CHARS
 import config
 import frontmatter
@@ -34,7 +35,7 @@ def create_non_post_files(all_directories, is_retro, pages_created_count, site_c
 
         all_files = os.listdir(directory_name)
 
-        for file in all_files:
+        for file in sorted(all_files, key=lambda s: "".join([char for char in s if char.isnumeric()])):
             f = directory_name + "/" + file
 
             file_name = f.replace(directory_name, "")
@@ -68,6 +69,10 @@ def create_template(path, **kwargs):
     # register filter
     template.filters["long_date"] = create_archives.long_date
     template.filters["date_to_xml_string"] = create_archives.date_to_xml_string
+    template.filters["archive_date"] = create_archives.archive_date
+
+    if path.endswith(".md"):
+        template_front_matter.content = markdown.markdown(template_front_matter.content)
 
     new_template = template.from_string(template_front_matter.content)
 
@@ -124,34 +129,25 @@ def process_page(directory_name, file_name, site_config, page_type=None, previou
     if front_matter.metadata.get("categories") == None:
         front_matter.metadata["categories"] = []
 
-    groups = (
-        ("Like", "likes"),
-        ("Bookmark", "bookmarks"),
-        ("Webmention", "replies"),
-        ("Reply", "replies"),
-        ("Repost", "reposts"),
-        ("RSVP", "rsvps"),
-        ("Drinking", "coffee"),
-    )
-
-    for g in groups:
-        if g[0] in front_matter.metadata["categories"]:
-            site_config[g[1]] = site_config[g[1]] + [front_matter.metadata]
-
     if file_name.endswith(".md"):
         front_matter.content = markdown.markdown(front_matter.content)
 
     # first three sentences will be considered "excerpt" value
-    front_matter.metadata["excerpt"] = ". ".join(front_matter.content.split(". ")[:3])
-    front_matter.metadata["slug"] = slugify(file_name.replace(".html", ""))
-    front_matter.metadata["url"] = front_matter.metadata["slug"]
+
+    soup = BeautifulSoup(front_matter.content, "html.parser")
+
+    if soup.find_all("p") and len(soup.find_all("p")) > 2:
+        front_matter.metadata["excerpt"] = " ".join([sentence.text for sentence in soup.find_all("p")[:2]])
+
+        # use first sentence for meta description
+        front_matter.metadata["meta_description"] = "".join(front_matter.metadata["excerpt"].split(". ")[0]) + "..."
+    else:
+        front_matter.metadata["excerpt"] = front_matter.content
 
     if front_matter.metadata["layout"].rstrip("s").lower() in ["like", "bookmark", "repost", "webmention", "note"]:
         site_config[front_matter.metadata["layout"].rstrip("s")] = site_config[front_matter.metadata["layout"].rstrip("s")] + [front_matter.metadata]
 
     print("Generating " + file_name)
-
-    rendered_string = create_template(file_name, site=site_config, page=front_matter.metadata, paginator=None)
 
     if page_type == "post":
         path_to_save = OUTPUT + "/" + file_name.replace(BASE_DIR, "").strip("/")
@@ -172,12 +168,15 @@ def process_page(directory_name, file_name, site_config, page_type=None, previou
         
         path_to_save = OUTPUT + "/" + year + "/" + month + "/" + day + "/" + "-".join(file.split("-")[3:]).split(".")[0] + ".html"
     else:
-        path_to_save = OUTPUT + "/" + file_name.replace(BASE_DIR, "").strip("/").replace("templates/", "").replace("_", "")
-
+        path_to_save = OUTPUT + "/" + file_name.replace(BASE_DIR, "").strip("/").replace("templates/", "").replace("_", "").replace(".md", ".html")
+        
     if front_matter.get("permalink"):
         path_to_save = OUTPUT + front_matter.get("permalink").rstrip("/") + ".html"
         
     front_matter.metadata["url"] = path_to_save.replace(OUTPUT, "")
+    front_matter.metadata["slug"] = front_matter.metadata["url"]
+
+    rendered_string = create_template(file_name, site=site_config, page=front_matter.metadata, paginator=None)
 
     dir_to_save = "/".join(path_to_save.split("/")[:-1])
 
@@ -200,6 +199,22 @@ def process_page(directory_name, file_name, site_config, page_type=None, previou
                 site_config["categories"][category] = [front_matter.metadata]
             else:
                 site_config["categories"][category] = site_config["categories"][category] + [front_matter.metadata]
+
+    groups = (
+        ("Like", "likes"),
+        ("Bookmark", "bookmarks"),
+        ("Webmention", "webmentions"),
+        ("Reply", "webmentions"),
+        ("Repost", "reposts"),
+        ("RSVP", "rsvps"),
+        ("Drinking", "drinking"),
+    )
+
+    for g in groups:
+        if g[0] in front_matter.metadata["categories"]:
+            site_config[g[1]] = site_config[g[1]] + [front_matter.metadata]
+        elif g[1].rstrip("s") in directory_name:
+            site_config[g[1]] = site_config[g[1]] + [front_matter.metadata]
 
     return site_config
 
@@ -246,6 +261,11 @@ def main(is_retro):
     all_directories = os.listdir(BASE_DIR)
 
     site_config["posts"].reverse()
+
+    categories = site_config["categories"].keys()
+
+    for category in categories:
+        site_config["categories"][category].reverse()
 
     site_config, pages_created_count = create_non_post_files(all_directories, is_retro, pages_created_count, site_config)
 
