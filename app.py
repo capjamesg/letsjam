@@ -2,13 +2,15 @@ import create_archives
 import feeds
 from bs4 import BeautifulSoup
 from config import BASE_DIR, OUTPUT, ALLOWED_SLUG_CHARS
-import config
 import frontmatter
 import datetime
 import markdown
 import jinja2
 import shutil
+import yaml
 import os
+
+allowed_slug_chars = ["-", "/", ".", "_"]
 
 start_time = datetime.datetime.now()
 
@@ -24,7 +26,7 @@ if not os.path.exists("_site"):
 posts = sorted(os.listdir("_posts"), key=lambda s: "".join([char for char in s if char.isnumeric()]))
 
 def create_non_post_files(all_directories, is_retro, pages_created_count, site_config):
-    do_not_process = ("_posts", "_layouts", "_site", "assets", "_includes")
+    do_not_process = ("_posts", "_layouts", "_site", "assets", "_includes", "_drafts")
 
     for directory in all_directories:
         directory_name = BASE_DIR + "/" + directory
@@ -47,12 +49,13 @@ def create_non_post_files(all_directories, is_retro, pages_created_count, site_c
 
             if file_name.startswith("."):
                 continue
+
             elif file_name == "/archive.html":
                 continue
 
             if extension == "md" or extension == "html":
                 process_page(directory_name, f, site_config, None, None, is_retro)
-            else:
+            elif extension != "py" and extension != "pyc":
                 shutil.copy(f, OUTPUT + "/" + file_name)
 
             pages_created_count += 1
@@ -261,7 +264,14 @@ def create_posts(is_retro, pages_created_count, site_config):
 def main(is_retro):
     pages_created_count = 0
 
-    site_config = config.site_config
+    site_config = yaml.load(open("config.yml", "r"))
+
+    site_config["months"] = []
+    site_config["years"] = []
+
+    if site_config.get("groups"):
+        for g in site_config["groups"]:
+            site_config[g] = []
 
     site_config, pages_created_count = create_posts(is_retro, pages_created_count, site_config)
 
@@ -275,19 +285,29 @@ def main(is_retro):
     categories = site_config["categories"].keys()
 
     for category in categories:
-        site_config["categories"][category].reverse()
+        if category.lower() != "post":
+            site_config["categories"][category].reverse()
 
     site_config, pages_created_count = create_non_post_files(all_directories, is_retro, pages_created_count, site_config)
 
     os.mkdir("_site/category")
 
-    site_config, pages_created_count = create_archives.create_category_pages(site_config, BASE_DIR, OUTPUT, pages_created_count)
+    if site_config.get("auto_generate"):
+        if "category" in site_config["auto_generate"]:
+            site_config, pages_created_count = create_archives.create_category_pages(site_config, BASE_DIR, OUTPUT, pages_created_count)
 
-    site_config, pages_created_count = create_archives.create_pagination_pages(site_config, OUTPUT, pages_created_count)
+            # move _site/category/post to _site/posts/
+            # this contains the main post archive (as defined as articles with the category "Post")
+            os.rename("_site/category/post", "_site/posts")
 
-    site_config, pages_created_count = create_archives.create_date_archive_pages(site_config, OUTPUT, pages_created_count, posts)
+        if "pagination" in site_config["auto_generate"]:
+            site_config, pages_created_count = create_archives.create_pagination_pages(site_config, OUTPUT, pages_created_count)
 
-    site_config, pages_created_count = create_archives.create_list_pages(BASE_DIR, site_config, OUTPUT, pages_created_count)
+        if "date_archive" in site_config["auto_generate"]:
+            site_config, pages_created_count = create_archives.create_date_archive_pages(site_config, OUTPUT, pages_created_count, posts)
+
+        if "list_page" in site_config["auto_generate"]:
+            site_config, pages_created_count = create_archives.create_list_pages(BASE_DIR, site_config, OUTPUT, pages_created_count)
 
     create_archives.generate_sitemap(site_config, OUTPUT)
 
