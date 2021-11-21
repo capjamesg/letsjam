@@ -1,0 +1,27 @@
+title: James' Coffee Blog
+description: A blog about drinking and brewing coffee at home.
+logo: "https://jamesg.blog/favicon.ico"
+author: James' Coffee Blog
+
+baseurl: "https://jamesg.blog"
+
+base_dir: "/home/james/Projects/letsjam"
+output: "/home/james/Projects/letsjam/_site"
+allowed_slug_chars: ["-", "/", ".", "_"]
+
+groups:
+  - posts
+  - likes
+  - bookmarks
+  - replies
+  - reposts
+  - drinking
+  - rsvps
+  - pages
+  - webmentions
+
+auto_generate:
+  - category
+  - pagination
+  - date_archive
+  - list_page
