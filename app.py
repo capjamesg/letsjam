@@ -8,13 +8,14 @@ import markdown
 import jinja2
 import shutil
 import yaml
+import sys
 import os
 
 allowed_slug_chars = ["-", "/", ".", "_"]
 
 start_time = datetime.datetime.now()
 
-post_directory = "/home/james/Projects/letsjam/_posts"
+post_directory = "_posts"
 
 # remove _site dir and all files in it
 shutil.rmtree("_site", ignore_errors=True)
@@ -40,6 +41,9 @@ def create_non_post_files(all_directories, is_retro, pages_created_count, site_c
         for file in sorted(all_files, key=lambda s: "".join([char for char in s if char.isnumeric()])):
             f = directory_name + "/" + file
 
+            if os.path.isdir(f):
+                continue
+
             file_name = f.replace(directory_name, "")
 
             extension = file_name.split(".")[-1]
@@ -54,8 +58,8 @@ def create_non_post_files(all_directories, is_retro, pages_created_count, site_c
                 continue
 
             if extension == "md" or extension == "html":
-                process_page(directory_name, f, site_config, None, None, is_retro)
-            elif extension != "py" and extension != "pyc":
+                process_page(directory_name, f, site_config)
+            elif extension != "py" and extension != "pyc" and not os.path.isdir(f):
                 shutil.copy(f, OUTPUT + "/" + file_name)
 
             pages_created_count += 1
@@ -268,6 +272,7 @@ def main(is_retro):
 
     site_config["months"] = []
     site_config["years"] = []
+    site_config["categories"] = {}
 
     if site_config.get("groups"):
         for g in site_config["groups"]:
@@ -329,7 +334,10 @@ def slugify(post_path):
     return "".join([char for char in post_path.replace(" ", "-") if char.isalnum() or char in ALLOWED_SLUG_CHARS]).replace(".md", ".html")
 
 if __name__ == "__main__":
-    main(is_retro=False)
+    if len(sys.argv) > 1 and sys.argv[1] == "--retro":
+        main(is_retro=True)
+    else:
+        main(is_retro=False)
 
     end_time = datetime.datetime.now()
 
