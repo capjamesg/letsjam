@@ -64,7 +64,7 @@ def create_non_post_files(all_directories, pages_created_count, site_config):
 
             if extension in ("md", "html") and not os.path.isdir(f):
                 process_page(directory_name, f, site_config)
-            elif extension in ("py", "pyc", "cfg") and not os.path.isdir(f):
+            elif extension not in ("py", "pyc", "cfg") and not os.path.isdir(f):
                 shutil.copy(f, OUTPUT + "/" + file_name)
 
             pages_created_count += 1
@@ -197,12 +197,14 @@ def process_page(directory_name, file_name, site_config, page_type=None, previou
         
         path_to_save = OUTPUT + "/" + year + "/" + month + "/" + day + "/" + "-".join(file.split("-")[3:]).split(".")[0] + "/index.html"
     else:
-        path_to_save = OUTPUT + "/" + file_name.replace(BASE_DIR, "").strip("/").replace("templates/", "").replace("_", "").replace(".md", ".html")
+        path_to_save = OUTPUT + "/" + file_name.strip("/").replace("templates/", "").replace("_", "").replace(".md", "") + "/index.html"
 
         if path_to_save.endswith("html") and not path_to_save.endswith(".html"):
             path_to_save = path_to_save.replace("html", ".html")
         
-    if front_matter.get("permalink"):
+    if front_matter.get("permalink") and front_matter.get("permalink").endswith(".html"):
+        path_to_save = OUTPUT + front_matter.get("permalink").rstrip("/")
+    elif front_matter.get("permalink"):
         path_to_save = OUTPUT + front_matter.get("permalink").rstrip("/") + "/" + "index.html"
         
     front_matter.metadata["url"] = path_to_save.replace(OUTPUT, "").replace("/index.html", "/").replace("/templates/", "").replace("index.html", "/").replace(".html", "")
@@ -370,6 +372,9 @@ def main():
     create_archives.generate_sitemap(site_config, OUTPUT)
 
     feeds.create_feeds(site_config, posts)
+
+    if os.path.exists("templates/robots.txt"):
+        shutil.copyfile("templates/robots.txt", "_site/robots.txt")
 
     if os.path.exists("assets"):
         shutil.copytree("assets", "_site/assets")

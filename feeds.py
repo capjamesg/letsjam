@@ -32,25 +32,31 @@ def create_feeds(site_config, posts):
         print("Creating feed: " + feed_name)
 
         if feed_name.endswith(".jf2"):
+            year, month, day = post["url"].split(".")[:3]
+
+            date_published = "{}-{}-{}T00:00:00-00:00".format(year, month, day)
+
             full_jf2_feed = {
                 "type": "feed",
                 "items": []
             }
+
             for post in feed_items:
                 entry = {
                     "type": "entry",
-                    "url": post["url"],
+                    "url": site_config["baseurl"] + post["url"],
                     "category": post["categories"],
                     "author": {
                         "url": site_config["baseurl"],
                         "name": site_config["title"],
                         "photo": site_config["avatar"]
                     },
+                    "published": date_published,
                     "post-type": "post"
                 }
 
                 if post.get("image"):
-                    entry["image"] = post["image"]
+                    entry["image"] = site_config["baseurl"] + post["image"]
 
                 if post.get("title"):
                     entry["title"] = post["title"]
@@ -68,6 +74,10 @@ def create_feeds(site_config, posts):
                 file.write(json.dumps(full_jf2_feed))
 
         elif feed_name.endswith(".json"):
+            year, month, day = post["url"].split(".")[:3]
+
+            date_published = "{}-{}-{}T00:00:00-00:00".format(year, month, day)
+
             full_json_feed = {
                 "feed_url": site_config["baseurl"] + "/" + feed_name,
                 "title": feed_title,
@@ -81,16 +91,17 @@ def create_feeds(site_config, posts):
             }
             for post in feed_items:
                 entry = {
-                    "url": post["url"],
-                    "id": post["url"],
+                    "url": site_config["baseurl"] + post["url"],
+                    "id": site_config["baseurl"] + post["url"],
                     "author": {
                         "url": site_config["baseurl"],
                         "name": site_config["author"]
-                    }
+                    },
+                    "date_published": date_published
                 }
                 
                 if post.get("image"):
-                    entry["image"] = post["image"]
+                    entry["image"] = site_config["baseurl"] + post["image"]
 
                 if post.get("title"):
                     entry["title"] = post["title"]
@@ -114,6 +125,10 @@ def create_feeds(site_config, posts):
             full_feed.description(feed_title)
             full_feed.language("en")
 
+            year, month, day = post["url"].split(".")[:3]
+
+            date_published = "{}-{}-{}T00:00:00-00:00".format(year, month, day)
+
             for post in feed_items:
                 feed_entry = full_feed.add_entry()
 
@@ -127,6 +142,7 @@ def create_feeds(site_config, posts):
                 feed_entry.link(href=site_config["baseurl"] + post["url"])
                 feed_entry.description(post["excerpt"])
                 feed_entry.author(name=site_config["author"])
+                feed_entry.published(date_published)
                 
                 if post.get("image"):
                     feed_entry.enclosure(site_config["baseurl"] + post["image"], 0, "image/jpeg")
