@@ -32,16 +32,16 @@ def create_feeds(site_config, posts):
         print("Creating feed: " + feed_name)
 
         if feed_name.endswith(".jf2"):
-            year, month, day = post["url"].split(".")[:3]
-
-            date_published = "{}-{}-{}T00:00:00-00:00".format(year, month, day)
-
             full_jf2_feed = {
                 "type": "feed",
                 "items": []
             }
 
             for post in feed_items:
+                year, month, day = post["url"].split(".")[:3]
+
+                date_published = "{}-{}-{}T00:00:00-00:00".format(year, month, day)
+                
                 entry = {
                     "type": "entry",
                     "url": site_config["baseurl"] + post["url"],
@@ -74,10 +74,6 @@ def create_feeds(site_config, posts):
                 file.write(json.dumps(full_jf2_feed))
 
         elif feed_name.endswith(".json"):
-            year, month, day = post["url"].split(".")[:3]
-
-            date_published = "{}-{}-{}T00:00:00-00:00".format(year, month, day)
-
             full_json_feed = {
                 "feed_url": site_config["baseurl"] + "/" + feed_name,
                 "title": feed_title,
@@ -90,6 +86,10 @@ def create_feeds(site_config, posts):
                 "items": []
             }
             for post in feed_items:
+                year, month, day = post["url"].split(".")[:3]
+
+                date_published = "{}-{}-{}T00:00:00-00:00".format(year, month, day)
+
                 entry = {
                     "url": site_config["baseurl"] + post["url"],
                     "id": site_config["baseurl"] + post["url"],
@@ -125,11 +125,11 @@ def create_feeds(site_config, posts):
             full_feed.description(feed_title)
             full_feed.language("en")
 
-            year, month, day = post["url"].split(".")[:3]
-
-            date_published = "{}-{}-{}T00:00:00-00:00".format(year, month, day)
-
             for post in feed_items:
+                year, month, day = post["url"].split(".")[:3]
+
+                date_published = "{}-{}-{}T00:00:00-00:00".format(year, month, day)
+
                 feed_entry = full_feed.add_entry()
 
                 feed_entry.id(site_config["baseurl"] + post["url"])
