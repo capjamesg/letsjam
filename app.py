@@ -206,9 +206,13 @@ def process_page(directory_name, file_name, site_config, page_type=None, previou
         path_to_save = OUTPUT + front_matter.get("permalink").rstrip("/")
     elif front_matter.get("permalink"):
         path_to_save = OUTPUT + front_matter.get("permalink").rstrip("/") + "/" + "index.html"
+
+    url = path_to_save.replace(OUTPUT, "").replace("/index.html", "/").replace("/templates/", "").replace("index.html", "/").replace(".html", "").replace("./", "")
         
-    front_matter.metadata["url"] = path_to_save.replace(OUTPUT, "").replace("/index.html", "/").replace("/templates/", "").replace("index.html", "/").replace(".html", "")
-    front_matter.metadata["slug"] = front_matter.metadata["url"]
+    front_matter.metadata["url"] = url
+    front_matter.metadata["slug"] = url
+    front_matter.metadata["date_published"] = feeds.get_date_published(file_name.split("/")[-1])
+    front_matter.metadata["content"] = front_matter.content
 
     rendered_string = create_template(
         file_name,
@@ -247,10 +251,12 @@ def process_page(directory_name, file_name, site_config, page_type=None, previou
         ("Repost", "reposts"),
         ("RSVP", "rsvps"),
         ("Drinking", "drinking"),
+        ("Coffee", "drinking"),
     )
 
     for g in groups:
-        if g[0] in front_matter.metadata["categories"]:
+        lower_categories = [category.lower() for category in front_matter.metadata["categories"]]
+        if g[0].lower() in lower_categories:
             site_config[g[1]] = site_config[g[1]] + [front_matter.metadata]
         elif g[1].rstrip("s") in directory_name:
             site_config[g[1]] = site_config[g[1]] + [front_matter.metadata]
