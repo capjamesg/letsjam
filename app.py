@@ -101,6 +101,11 @@ def create_template(path, **kwargs):
         parent_front_matter = frontmatter.load("_layouts/" + template_front_matter.metadata["layout"] + ".html")
         parent_template = template.from_string(parent_front_matter.content)
 
+        if len(sys.argv) > 1 and sys.argv[1] == "--retro" \
+                and parent_front_matter.metadata.get("layout") \
+                    and parent_front_matter.metadata["layout"] == "default":
+            parent_front_matter.metadata["layout"] = "retro"
+
         new_template = parent_template.render(content=new_template.render(kwargs), **kwargs)
 
         kwargs["content"] = new_template
@@ -110,7 +115,7 @@ def create_template(path, **kwargs):
         else:
             template = new_template
     else:
-        template = new_template.render(kwargs)
+        template = new_template.render(kwargs) 
 
     if len(sys.argv) > 1 and sys.argv[1] == "--retro":
         template = template.replace('<div id="main">', '<div id="main" class="flex_right_home">')
