@@ -94,6 +94,21 @@ def create_pagination_pages(site_config, output, pages_created_count):
         number_of_pages = int(len(entries) / 10) + 1
 
         for page in range(0, number_of_pages):
+            paginator = {
+                "total_pages": number_of_pages,
+                "previous_page": page - 1,
+                "next_page": page + 1,
+            }
+
+            increment_value = page + 1
+
+            if increment_value - 1 <= 0:
+                paginator["previous_page_path"] = "/category/" + category.lower() + "/"
+                paginator["next_page_path"] = "/category/" + category.lower() + "/1/"
+            else:
+                paginator["previous_page_path"] = "/category/" + category.lower() + "/" + str(increment_value - 1) + "/"
+                paginator["next_page_path"] = "/category/" + category.lower() + "/" + str(increment_value - 1) + "/"
+
             page_contents = site_config
 
             page_contents["posts"] = entries[page * 10:page * 10 + 10]
@@ -105,17 +120,19 @@ def create_pagination_pages(site_config, output, pages_created_count):
                 page=page_contents,
                 category=category,
                 site=site_config,
-                paginator=None
+                paginator=paginator
             )
 
-            path_to_save = output + "/" + "category/" + category.lower() + "/" + str(page + 1) + ".html"
+            path_to_save = output + "/" + "category/" + category.lower() + "/" + str(page + 1) + "/"
 
-            if not os.path.exists(slugify("/".join(path_to_save.split("/")[:-1]))):
-                os.makedirs(slugify("/".join(path_to_save.split("/")[:-1])))
+            path_to_save = slugify("/".join(path_to_save.split("/")[:-1]))
+
+            if not os.path.exists(path_to_save):
+                os.makedirs(path_to_save)
 
             print("Generating {} Archive Page ({})".format(category, path_to_save))
 
-            with open(slugify(path_to_save), "w+") as file:
+            with open(slugify(path_to_save + "/index.html"), "w+") as file:
                 file.write(template)
 
             pages_created_count += 1
@@ -367,7 +384,7 @@ def generate_sitemap(site_config, output):
     """
     lastmod = datetime.datetime.now().strftime("%Y-%m-%d")
 
-    sitemap = create_template("templates/sitemap.xml", pages=site_config["pages"], lastmod=lastmod)
+    sitemap = create_template("templates/sitemap.xml", base_url=site_config["baseurl"], pages=site_config["pages"], lastmod=lastmod)
 
     with open(slugify(output + "/sitemap.xml"), "w+") as file:
         file.write(sitemap)

@@ -243,6 +243,9 @@ def process_page(directory_name, file_name, site_config, page_type=None, previou
         site_config["posts"] = site_config["posts"] + [front_matter.metadata]
 
         for category in front_matter.metadata["categories"]:
+            if "(Series)" in category:
+                site_config["series_posts"].append([front_matter.metadata["categories"][0], file_name.replace("_posts", ""), front_matter.metadata["url"]])
+                
             if site_config["categories"].get(category) is None:
                 site_config["categories"][category] = [front_matter.metadata]
             else:
@@ -309,6 +312,53 @@ def create_posts(pages_created_count, site_config):
 
     return site_config, pages_created_count
 
+def render_series_fragment(site_config):
+    """
+        Adds "other posts in this series" fragment to series posts.
+    """
+    series_fragment = open("_includes/posts_in_series.html", "r").read()
+
+    for post_object in site_config["series_posts"]:
+        print("Generating 'Other posts in this series' fragment for " + post_object[1])
+        category, post_name, page_url = post_object
+
+        loader = jinja2.FileSystemLoader(searchpath="./")
+
+        template = jinja2.Environment(loader=loader)
+
+        rendered_series_text = template.from_string(series_fragment)
+
+        posts_to_show = site_config["categories"].get(category)
+
+        see_more_link = False
+
+        if len(posts_to_show) > 10:
+            see_more_link = True
+
+        category_slug = category.replace(" ", "-").lower().replace("(", "").replace(")", "")
+
+        rendered_series_text = rendered_series_text.render(
+            posts_in_series=posts_to_show[:10],
+            see_more_link=see_more_link,
+            site=site_config,
+            category_slug=category_slug,
+            page={"url": page_url}
+        )
+        
+        year_month_date = "/".join(post_name.split("-")[:3]) + "/"
+
+        post_name = "-".join(post_name.split("-")[3:]).replace(".md", "").replace(".html", "")
+
+        with open(OUTPUT + year_month_date + post_name + "/index.html", "r") as file:
+            file_content = file.read()
+
+        file_content = file_content.replace("<!--- posts_in_series -->", rendered_series_text)
+
+        with open(OUTPUT + year_month_date + post_name + "/index.html", "w") as file:
+            file.write(file_content)
+
+    return series_fragment
+
 def main():
     """
         Main function.
@@ -320,6 +370,7 @@ def main():
     site_config["months"] = []
     site_config["years"] = []
     site_config["categories"] = {}
+    site_config["series_posts"] = []
 
     if site_config.get("groups"):
         for group in site_config["groups"]:
@@ -339,6 +390,8 @@ def main():
     for category in categories:
         if category.lower() != "post":
             site_config["categories"][category].reverse()
+
+    render_series_fragment(site_config)
 
     site_config, pages_created_count = create_non_post_files(all_directories, pages_created_count, site_config)
 
