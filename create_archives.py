@@ -107,7 +107,7 @@ def create_pagination_pages(site_config, output, pages_created_count):
                 paginator["next_page_path"] = "/category/" + category.lower() + "/1/"
             else:
                 paginator["previous_page_path"] = "/category/" + category.lower() + "/" + str(increment_value - 1) + "/"
-                paginator["next_page_path"] = "/category/" + category.lower() + "/" + str(increment_value - 1) + "/"
+                paginator["next_page_path"] = "/category/" + category.lower() + "/" + str(increment_value + 1) + "/"
 
             page_contents = site_config
 
