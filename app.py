@@ -1,5 +1,6 @@
 import os
 import sys
+import json
 import shutil
 import datetime
 import frontmatter
@@ -87,6 +88,69 @@ def create_template(path, **kwargs):
     template.filters["date_to_xml_string"] = create_archives.date_to_xml_string
     template.filters["archive_date"] = create_archives.archive_date
 
+    # example markup for person tags
+    # @jamesg.blog
+
+    # example tag
+    # {
+    #     "jamesg.blog": {
+    #         "full_name": "James' Coffee Blog",
+    #         "url": "https://jamesg.blog"
+    #     }
+    # }
+
+    if "person_tags" in kwargs.keys():
+        person_tags = []
+
+        for w in template_front_matter.content.split():
+            w = w.lower()
+            # don't get single @ characters that are alone
+            if w.startswith("@") and w.strip() != "@":
+                # ignore 's in the name
+                w = w.split("'")[0]
+
+                check_for_tag = kwargs["person_tags"].get(w.replace("@", ""), {})
+
+                if check_for_tag == {}:
+                    if "[" in w and "]" in w:
+                        name = w.split("[")[-1].split("]")[0]
+                    else:
+                        name = w.replace("@", "")
+
+                    template_front_matter.content = template_front_matter.content.replace(
+                        w,
+                        "[{}](https://{})" .format(name, w.replace("@", ""))
+                    )
+
+                    person_tags.append( "[{}](https://{})" .format(name, w.replace("@", "")))
+                elif "." in w:
+                    # only run if . is in the tag, indicating a url
+
+                    # replace @ mention with full name and anchor to url
+                    template_front_matter.content = template_front_matter.content.replace(
+                        w,
+                        "[{}](https://{})".format(check_for_tag.get("full_name", w), w)
+                    )
+
+                    if check_for_tag.get("favicon"):
+                        tag = "<p><a href='https://{}'><img src='{}' alt='{}' height='32' width='32' class='profile_tag'>  {}</a></p>" .format(
+                            check_for_tag.get("url", w),
+                            check_for_tag.get("favicon", ""),
+                            w.replace("@", ""),
+                            check_for_tag.get("full_name", w),
+                        )
+                    else:
+                        tag = "[{}](https://{})".format(check_for_tag.get("full_name", w), check_for_tag.get("url"))
+
+                    person_tags.append(tag)
+
+        person_tags = list(set(person_tags))
+
+        if len(person_tags) > 0:
+            template_front_matter.content = template_front_matter.content + \
+                "\n\n## Mentioned in this post 👤\n\n" + \
+                "".join(person_tags)
+
     if path.endswith(".md"):
         template_front_matter.content = markdown.markdown(template_front_matter.content)
 
@@ -122,7 +186,17 @@ def create_template(path, **kwargs):
     
     return template
 
-def process_page(directory_name, file_name, site_config, page_type=None, previous_page=None, next_post=None, next_post_url=None):
+def process_page(
+        directory_name,
+        file_name,
+        site_config,
+        page_type=None,
+        previous_page=None,
+        next_post=None,
+        next_post_url=None,
+        person_tags={}
+    ):
+
     front_matter = frontmatter.load(file_name)
     
     if previous_page:
@@ -161,18 +235,18 @@ def process_page(directory_name, file_name, site_config, page_type=None, previou
     if file_name.endswith(".md"):
         front_matter.content = markdown.markdown(front_matter.content)
 
-    soup = BeautifulSoup(front_matter.content, "html.parser")
+    soup = BeautifulSoup(front_matter.content, "lxml")
 
-    if soup.find_all("p") and len(soup.find_all("p")) > 2:
-        # first paragraph sentences will be considered "excerpt" value
-        front_matter.metadata["excerpt"] = " ".join([sentence.text for sentence in soup.find_all("p")[:1]])
+    # first paragraph sentences will be considered "excerpt" value
 
-        # use first sentence for meta description
-        front_matter.metadata["meta_description"] = "".join(front_matter.metadata["excerpt"].split(". ")[0]) + "..."
-    else:
-        # used as a fallback
-        front_matter.metadata["excerpt"] = front_matter.content
+    # .replace(" @", "") removes @ mentions
+    # @ mentions are not parsed at this time so they should not be formatted as raw @ mentions in the excerpts
 
+    front_matter.metadata["excerpt"] = " ".join([str(sentence) for sentence in soup.find_all("p")[:1]]).replace(" @", "")
+
+    # use first sentence for meta description
+    front_matter.metadata["meta_description"] = "".join(front_matter.metadata["excerpt"].split(". ")[0]).replace(" @", "") + "..."
+        
     if front_matter.metadata["layout"].rstrip("s").lower() in ["like", "bookmark", "repost", "webmention", "note"]:
         site_config[front_matter.metadata["layout"].rstrip("s")] = site_config[front_matter.metadata["layout"].rstrip("s")] + [front_matter.metadata]
 
@@ -213,7 +287,7 @@ def process_page(directory_name, file_name, site_config, page_type=None, previou
         path_to_save = OUTPUT + front_matter.get("permalink").rstrip("/") + "/" + "index.html"
 
     url = path_to_save.replace(OUTPUT, "").replace("/index.html", "/").replace("/templates/", "").replace("index.html", "/").replace(".html", "").replace("./", "")
-        
+
     front_matter.metadata["url"] = url
     front_matter.metadata["slug"] = url
     front_matter.metadata["date_published"] = feeds.get_date_published(file_name.split("/")[-1])
@@ -223,7 +297,8 @@ def process_page(directory_name, file_name, site_config, page_type=None, previou
         file_name,
         site=site_config,
         page=front_matter.metadata,
-        paginator=None
+        paginator=None,
+        person_tags=person_tags
     )
 
     dir_to_save = "/".join(path_to_save.split("/")[:-1])
@@ -242,9 +317,14 @@ def process_page(directory_name, file_name, site_config, page_type=None, previou
     if page_type == "post":
         site_config["posts"] = site_config["posts"] + [front_matter.metadata]
 
+        if type(front_matter.metadata["categories"]) == str:
+            front_matter.metadata["categories"] = [front_matter.metadata["categories"]]
+
         for category in front_matter.metadata["categories"]:
             if "(Series)" in category:
-                site_config["series_posts"].append([front_matter.metadata["categories"][0], file_name.replace("_posts", ""), front_matter.metadata["url"]])
+                site_config["series_posts"].append(
+                    [front_matter.metadata["categories"][0], file_name.replace("_posts", ""), front_matter.metadata["url"]]
+                )
                 
             if site_config["categories"].get(category) is None:
                 site_config["categories"][category] = [front_matter.metadata]
@@ -257,7 +337,6 @@ def process_page(directory_name, file_name, site_config, page_type=None, previou
         ("Webmention", "webmentions"),
         ("Reply", "webmentions"),
         ("Repost", "reposts"),
-        ("RSVP", "rsvps"),
         ("Drinking", "drinking"),
         ("Coffee", "drinking"),
     )
@@ -278,6 +357,9 @@ def create_posts(pages_created_count, site_config):
     post_files = posts
 
     previous_page = None
+
+    with open("person_tags.json", "r") as f:
+        person_tags = json.load(f)
 
     for post_item in range(0, len(post_files)):
         post_file = post_files[post_item]
@@ -303,7 +385,8 @@ def create_posts(pages_created_count, site_config):
             "post",
             previous_page,
             next_post,
-            next_post_url
+            next_post_url,
+            person_tags
         )
 
         previous_page = path

@@ -14,6 +14,7 @@ letsjam can:
 - Create date archive pages formatted as /YYYY/MM/DD/
 - Create paginated pages for each category you use on your blog (i.e. /category/coffee/2/)
 - Create pages for groups of posts
+- Use @ shortcuts to mention someone in a post
 
 ## Setup
 
@@ -90,6 +91,35 @@ This syntax is designed to be similar to Jekyll, a popular static site generator
 ### jinja2 and Jekyll Front Matter Distinction
 
 Please note this project is not compatible with every Jekyll file. You will need to use jinja2 markup rather than Liquid markup if you want to introduce logic to yuor pages. While both syntaxes share some features, a large portion of Liquid syntax (i.e. date formatting, string manipulation) and Jekyll syntax (i.e. limits and reverse sorting) is not supported natively by jinja2.
+
+### At Mentions (@ mentions)
+
+letsjam provides native support for @ mentions in accordance with IndieWeb [person tag](https://indieweb.org/person) best practices. You can use the following syntax to mention a URL in a blog post:
+
+    @jamesg.blog
+
+This will create a mention for jamesg.blog. This means, by default:
+
+1. A link will be created to jamesg.blog with the anchor text jamesg.blog inline.
+2. A new section will be added to the bottom of the blog post in which you mention any URL that lists all of the people mentioned in the post.
+
+Optionally, you can add your own anchor text and image for each mention in a post.
+
+You can do this by adding an entry to the person_tags.json file like so:
+
+    {
+        "jamesg.blog": {
+            "full_name": "James' Coffee Blog",
+            "url": "https://jamesg.blog",`
+            "favicon": "https://jamesg.blog/favicon.ico"
+        }
+    }
+
+Any time @jamesg.blog is mentioned, the full_name will be used as the anchor text and the url will be used as the link to the person. The key in the JSON object above is the text that must be matched for a profile to be found in the file. This text can be anything. For example, you could use "james" if you wanted to mention jamesg.blog with @james instead.
+
+You can use the favicon to add an image to the "mentioned" section at the bottom of any post in which you mention a website. These favicons do not appear in your post, only in the "mentioned" section at the bottom of a post.
+
+@ mentions are enabled by default and will only be used if you use the mention syntax described above in your blog.
 
 ## My Site
 
