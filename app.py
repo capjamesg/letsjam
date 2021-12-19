@@ -153,7 +153,7 @@ def create_template(path, **kwargs):
                             check_for_tag.get("full_name", w.replace("@", "")),
                         )
                     else:
-                        tag = "[{}](https://{})".format(check_for_tag.get("full_name", w.replace("@", "")), check_for_tag.get("url"))
+                        tag = "[{}]({})".format(check_for_tag.get("full_name", w.replace("@", "")), check_for_tag.get("url"))
 
                     person_tags.append(tag)
 
