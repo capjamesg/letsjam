@@ -63,8 +63,19 @@ def create_non_post_files(all_directories, pages_created_count, site_config):
             if file_name == "/archive.html":
                 continue
 
+            # webmentions should allow person tagging
+            # this feature only works if the generator can distinguish webmention pages from other pages
+            # else, the generator will add a person tagging section to every page, which is not intended
+
+            dir_name = directory_name.replace("./", "")
+
+            if dir_name == "_webmentions":
+                page_type = "webmention"
+            else:
+                page_type = None
+
             if extension in ("md", "html") and not os.path.isdir(f):
-                process_page(directory_name, f, site_config)
+                process_page(directory_name, f, site_config, page_type=page_type)
             elif extension not in ("py", "pyc", "cfg") and not os.path.isdir(f):
                 shutil.copy(f, OUTPUT + "/" + file_name)
 
@@ -99,7 +110,9 @@ def create_template(path, **kwargs):
     #     }
     # }
 
-    if "person_tags" in kwargs.keys():
+    if "person_tags" in kwargs.keys() and "page_type" in kwargs.keys() and \
+        (kwargs["page_type"] == "post" or kwargs["page_type"] == "webmention"):
+
         person_tags = []
 
         for w in template_front_matter.content.split():
@@ -129,7 +142,7 @@ def create_template(path, **kwargs):
                     # replace @ mention with full name and anchor to url
                     template_front_matter.content = template_front_matter.content.replace(
                         w,
-                        "[{}](https://{})".format(check_for_tag.get("full_name", w), w)
+                        "[{}](https://{})".format(check_for_tag.get("full_name", w.replace("@", "")), w.replace("@", ""))
                     )
 
                     if check_for_tag.get("favicon"):
@@ -137,10 +150,10 @@ def create_template(path, **kwargs):
                             check_for_tag.get("url", w),
                             check_for_tag.get("favicon", ""),
                             w.replace("@", ""),
-                            check_for_tag.get("full_name", w),
+                            check_for_tag.get("full_name", w.replace("@", "")),
                         )
                     else:
-                        tag = "[{}](https://{})".format(check_for_tag.get("full_name", w), check_for_tag.get("url"))
+                        tag = "[{}](https://{})".format(check_for_tag.get("full_name", w.replace("@", "")), check_for_tag.get("url"))
 
                     person_tags.append(tag)
 
@@ -183,7 +196,18 @@ def create_template(path, **kwargs):
 
     if len(sys.argv) > 1 and sys.argv[1] == "--retro":
         template = template.replace('<div id="main">', '<div id="main" class="flex_right_home">')
-    
+
+    soup = BeautifulSoup(template, "html.parser")
+
+    # all links
+    # all_links = soup.find_all("a")
+
+    # with open("all_links.json", "a+") as f:
+    #     for link in all_links:
+    #         if link.get("href") and "//" in link.get("href") and "jamesg.blog" not in link.get("href") and not link.get("href").startswith("/"):
+    #             classes = link.get("class")
+    #             f.write(json.dumps({"dst": link.get("href"), "src": "https://jamesg.blog", "classes": classes}) + "\n")
+
     return template
 
 def process_page(
@@ -246,6 +270,7 @@ def process_page(
 
     # use first sentence for meta description
     front_matter.metadata["meta_description"] = "".join(front_matter.metadata["excerpt"].split(". ")[0]).replace(" @", "") + "..."
+    front_matter.metadata["description"] = " ".join([sentence.text for sentence in soup.find_all("p")[:1]]).replace(" @", "")
         
     if front_matter.metadata["layout"].rstrip("s").lower() in ["like", "bookmark", "repost", "webmention", "note"]:
         site_config[front_matter.metadata["layout"].rstrip("s")] = site_config[front_matter.metadata["layout"].rstrip("s")] + [front_matter.metadata]
@@ -298,7 +323,8 @@ def process_page(
         site=site_config,
         page=front_matter.metadata,
         paginator=None,
-        person_tags=person_tags
+        person_tags=person_tags,
+        page_type=page_type
     )
 
     dir_to_save = "/".join(path_to_save.split("/")[:-1])
