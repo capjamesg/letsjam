@@ -19,8 +19,8 @@ groups:
   - pages
   - webmentions
 
-auto_generate:
-  - category
-  - pagination
-  - date_archive
-  - list_page
+# auto_generate:
+#   - category
+#   - pagination
+#   - date_archive
+#   - list_page

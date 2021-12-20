@@ -23,6 +23,10 @@ shutil.rmtree("_site", ignore_errors=True)
 if not os.path.exists("_site"):
     os.makedirs("_site")
 
+if not os.path.exists("person_tags.json"):
+    with open("person_tags.json", "w+") as f:
+        f.write("{}")
+
 posts = sorted(
     os.listdir("_posts"),
     key=lambda s: "".join([char for char in s if char.isnumeric()])

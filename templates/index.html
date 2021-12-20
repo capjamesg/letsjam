@@ -1,0 +1,29 @@
+---
+layout: default
+title: Home
+summary: A place where I share my thoughts on coffee and home brewing.
+permalink: /index.html
+---
+
+<h1>Letsjam Template</h1>
+
+<section class="h-card">
+	<div>
+		<h2>About Me <span role="img" aria-label="hand waving">👋</span></h2>
+		
+		<p>Hello! I'm <a href="/" class="p-name u-url p-given-name">a template</a>.</p>
+
+		<p class="p-note">This is an example blog built with letsjam.</p>
+	</div>
+</section>
+
+<section class="h-feed hfeed">
+	<h2 class="p-name">Blog Posts 📝</h2>
+	<p class="p-summary">Below are the most recent articles I have written.</p>
+	<ul class="blog">
+	  {% for post in site.posts[:5] %}
+		{% include "_includes/list_entry.html" %}
+	  {% endfor %}
+	</ul>
+	<p><a href="/posts/">View all blog posts</a>
+</section> 

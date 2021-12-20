@@ -16,6 +16,12 @@ letsjam can:
 - Create pages for groups of posts
 - Use @ shortcuts to mention someone in a post
 
+An example blog has been included with this project so you can get started quickly and have a reference point for key features.
+
+Here is a screenshot of the example blog:
+
+![Example blog home page](letsjam_example.png)
+
 ## Setup
 
 First, install the required dependencies for this project:
@@ -55,6 +61,25 @@ To run the static site generator, use this command:
     python3 app.py
 
 All files generated are placed in a _site directory. This directory is purged on each generation.
+
+### Folder Definitions
+
+The example application has been set up to use the following folder structure:
+
+- assets/: Any static assets (i.e. CSS, JS, images).
+- _posts/: All of your blog posts.
+- _drafts/: Your written drafts.
+- _layouts/: Page layouts.
+- _includes/: Resources to include in a web page.
+- templates/: Web page templates.
+
+The default project comes with five pages:
+
+- A sitemap.xml file
+- An index.html home page
+- A 404 page
+- An archive page
+- A page with a list of articles
 
 ### letsjam Server
 
@@ -125,7 +150,7 @@ You can use the favicon to add an image to the "mentioned" section at the bottom
 
 My blog, jamesg.blog, runs on letsjam. Here is a screenshot of my site home page, generated with letsjam:
 
-![My website home page](screenshot.png)
+![My website home page](james_site_screenshot.png)
 
 ## Technologies Used
 

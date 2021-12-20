@@ -1,0 +1,32 @@
+---
+layout: default
+permalink: /archive/
+title: Blog Archive
+description: The archive of blog posts published on this website.
+---
+
+<h1>Web Blog Archive 📝</h1>
+
+<p>This page contains links to the year, month, and category web log archive pages on my site.</p>
+
+{% for year, months in page.years.items() %}
+<h2>{{ year }}</h2>
+<ul class="article_list archive_article_list">
+        <li><a href="/archive/{{ year }}/1/">Browse all posts from {{ year }}</a></li>
+        {% for m in months %}
+        <li>
+            <a href="/archive/{{ year }}/{{ m.get('numeric') }}/1/">{{ m.get('written') }}</a>
+        </li>
+    {% endfor %}
+</ul>
+{% endfor %}
+
+<h2>Categories</h2>
+
+<ul class="article_list archive_article_list">
+{% for category in site.categories %}
+    <li>
+        <a href="/category/{{ category | replace(' ', '-') | replace('(', '') | replace(')', '') | lower }}">{{ category }}</a>
+    </li>
+{% endfor %}
+</ul>

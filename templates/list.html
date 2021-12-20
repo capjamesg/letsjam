@@ -1,0 +1,18 @@
+---
+layout: default
+permalink: /interviews/
+title: Coffee Interviews
+description: An archive of my interviews with people in the coffee industry.
+---
+
+<h1>Post List></h1>
+
+<p>This is a list of posts.</p>
+
+<h2>Post</h2>
+
+<ul class="article_list">
+	{% for post in site.categories["Post"] %}
+    	<li><a href="{{ post.url }}" class="interview">{{post.title}}</a> ({{ post.date | long_date }})</li>
+	{% endfor %}
+</ul>

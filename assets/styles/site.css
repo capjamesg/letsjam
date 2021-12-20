@@ -1,0 +1,29 @@
+html {
+    background-color: skyblue;
+    font-family: 'Open Sans', sans-serif;
+}
+main {
+    background-color: white;
+    border-radius: 10px;
+    width: 50%;
+    margin: 0 auto;
+    padding: 20px;
+}
+nav li {
+    display: inline-block;
+    margin-right: 10px;
+}
+ul {
+    list-style: none;
+    padding: 0;
+}
+img {
+    max-width: 100%;
+}
+.flex_right_home img {
+    float: right;
+}
+.flex_right_home {
+    flex: 1;
+    width: 100%;
+}
