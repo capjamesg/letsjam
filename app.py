@@ -136,17 +136,17 @@ def create_template(path, **kwargs):
 
                     template_front_matter.content = template_front_matter.content.replace(
                         w,
-                        "[{}](https://{})" .format(name, w.replace("@", ""))
+                        f"[{name}](https://{w.replace('@', '')})"
                     )
 
-                    person_tags.append( "[{}](https://{})" .format(name, w.replace("@", "")))
+                    person_tags.append(f"[{name}](https://{w.replace('@', '')})")
                 elif "." in w:
                     # only run if . is in the tag, indicating a url
 
                     # replace @ mention with full name and anchor to url
                     template_front_matter.content = template_front_matter.content.replace(
                         w,
-                        "[{}](https://{})".format(check_for_tag.get("full_name", w.replace("@", "")), w.replace("@", ""))
+                        f"[{check_for_tag.get('full_name', w.replace('@', ''))}](https://{w.replace('@', '')})"
                     )
 
                     if check_for_tag.get("favicon"):
@@ -157,7 +157,7 @@ def create_template(path, **kwargs):
                             check_for_tag.get("full_name", w.replace("@", "")),
                         )
                     else:
-                        tag = "[{}]({})".format(check_for_tag.get("full_name", w.replace("@", "")), check_for_tag.get("url"))
+                        tag = f"[{check_for_tag.get('full_name', w.replace('@', ''))}]({check_for_tag.get('url')})"
 
                     person_tags.append(tag)
 
@@ -276,7 +276,7 @@ def process_page(
     front_matter.metadata["meta_description"] = "".join(front_matter.metadata["excerpt"].split(". ")[0]).replace(" @", "") + "..."
     front_matter.metadata["description"] = " ".join([sentence.text for sentence in soup.find_all("p")[:1]]).replace(" @", "")
         
-    if front_matter.metadata["layout"].rstrip("s").lower() in ["like", "bookmark", "repost", "webmention", "note"]:
+    if front_matter.metadata["layout"].rstrip("s").lower() in ["like", "bookmark", "repost", "webmention", "note", "watche"]:
         site_config[front_matter.metadata["layout"].rstrip("s")] = site_config[front_matter.metadata["layout"].rstrip("s")] + [front_matter.metadata]
 
     print("Generating " + file_name)
@@ -320,7 +320,16 @@ def process_page(
     front_matter.metadata["url"] = url
     front_matter.metadata["slug"] = url
     front_matter.metadata["date_published"] = feeds.get_date_published(file_name.split("/")[-1])
+
+    try:
+        front_matter.metadata["long_date"] = datetime.datetime.strptime(front_matter.metadata["date_published"], "%Y-%m-%dT%H:%M:%S-00:00").strftime("%B %d, %Y")
+    except:
+        front_matter.metadata["long_date"] = ""
+
     front_matter.metadata["content"] = front_matter.content
+
+    front_matter.metadata["created_on"] = datetime.datetime.fromtimestamp(os.stat(file_name).st_ctime).strftime('%B %d, %Y')
+    front_matter.metadata["modified_on"] = datetime.datetime.fromtimestamp(os.stat(file_name).st_mtime).strftime('%B %d, %Y')
 
     rendered_string = create_template(
         file_name,
@@ -369,6 +378,8 @@ def process_page(
         ("Repost", "reposts"),
         ("Drinking", "drinking"),
         ("Coffee", "drinking"),
+        ("Watch", "watches"),
+        ("Wiki", "wiki")
     )
 
     for g in groups:

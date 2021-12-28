@@ -1,4 +1,5 @@
 import json
+import datetime
 import os
 from feedgen.feed import FeedGenerator
 
@@ -8,9 +9,14 @@ def get_date_published(url):
     if url.count("-") > 2 and url.split("-")[1].isnumeric():
         year, month, day = url.split("-")[:3]
 
-        date_published = "{}-{}-{}T00:00:00-00:00".format(year, month, day)
+        date_published = f"{year}-{month}-{day}T00:00:00-00:00"
 
-    return date_published
+    try:
+        formatted_date = datetime.datetime.strptime(date_published, "%Y-%m-%dT%H:%M:%S%z").strftime("%B %d, %Y")
+    except:
+        formatted_date = ""
+
+    return formatted_date
 
 def retrieve_image(post, site_config):
     if post.get("image") and type(post["image"]) is str:
@@ -205,7 +211,10 @@ def create_feeds(site_config, posts):
                 feed_entry.author({"name": site_config["author"]})
 
                 if post["date_published"] != "":
-                    feed_entry.published(post["date_published"])
+                    try:
+                        feed_entry.published(post["date_published"])
+                    except:
+                        continue
 
                 image = retrieve_image(post, site_config)
                 

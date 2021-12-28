@@ -60,7 +60,7 @@ def generate_archive_page(
     posts = entries[increment * 10:increment * 10 + 10]
 
     page = {
-        "title": "Entries for {}".format(date),
+        "title": f"Entries for {date}",
         "date": date,
         "posts": posts,
         "url": output + "/archive/" + date + "/" + str(increment + 1) + "/"
@@ -74,7 +74,7 @@ def generate_archive_page(
         paginator=paginator
     )
 
-    print("Generating Archive Page {} ({})".format(date, increment))
+    print(f"Generating Archive Page {date} ({increment})")
 
     increment = str(increment + 1)
 
@@ -130,7 +130,7 @@ def create_pagination_pages(site_config, output, pages_created_count):
             if not os.path.exists(path_to_save):
                 os.makedirs(path_to_save)
 
-            print("Generating {} Archive Page ({})".format(category, path_to_save))
+            print(f"Generating {category} Archive Page ({path_to_save})")
 
             with open(slugify(path_to_save + "/index.html"), "w+") as file:
                 file.write(template)
@@ -209,7 +209,7 @@ def create_category_pages(site_config, base_dir, output, pages_created_count):
                     paginator=paginator
                 )
 
-            print("Generating {} Category Page".format(category))
+            print(f"Generating {category} Category Page")
 
             increment = str(increment)
 
@@ -230,7 +230,7 @@ def create_list_pages(base_dir, site_config, output, pages_created_count):
     """
         Creates pages for specified groups (i.e. "likes").
     """
-    list_pages = ["likes", "bookmarks", "webmentions", "rsvps", "drinking"]
+    list_pages = ["likes", "bookmarks", "webmentions", "drinking", "watches"]
     
     for page in list_pages:
         number_of_pages = int(len(site_config[page]) / 10) + 1
@@ -261,7 +261,7 @@ def create_list_pages(base_dir, site_config, output, pages_created_count):
                 paginator=paginator
             )
 
-            print("Generating {} List Page".format(page))
+            print(f"Generating {page} List Page")
 
             increment = str(increment)
 
@@ -273,6 +273,18 @@ def create_list_pages(base_dir, site_config, output, pages_created_count):
             )
 
             pages_created_count += 1
+
+    template = create_template(
+        base_dir + "/templates/all_likes.html",
+        page={"posts": site_config["likes"], "url": "/likes/all/"},
+        site=site_config,
+        paginator=paginator
+    )
+
+    print(f"Generating {page} Archive Page")
+
+    with open("_site/likes/all/index.html", "w+") as file:
+        file.write(template)
 
     return site_config, pages_created_count
 
@@ -295,12 +307,12 @@ def create_date_archive_pages(site_config, output, pages_created_count, posts):
         if not year.isdigit() or not month.isdigit():
             continue
 
-        date = "{}/{}".format(year, month)
+        date = f"{year}/{month}"
 
-        if posts_by_date.get("{}-{}".format(year, month)) == None:
-            posts_by_date["{}-{}".format(year, month)] = [post]
+        if posts_by_date.get(f"{year}-{month}") == None:
+            posts_by_date[f"{year}-{month}"] = [post]
         else:
-            posts_by_date["{}-{}".format(year, month)] = posts_by_date["{}-{}".format(year, month)] + [post]
+            posts_by_date[f"{year}-{month}"] = posts_by_date[f"{year}-{month}"] + [post]
 
         if posts_by_year.get(year) == None:
             posts_by_year[year] = [post]
@@ -355,10 +367,15 @@ def create_date_archive_pages(site_config, output, pages_created_count, posts):
 
         written_month = datetime.datetime.strptime(month, "%m").strftime("%B")
 
+        month_object = {
+            "written": written_month,
+            "numeric": month
+        }
+
         if archive_object["years"].get(year) == None:
-            archive_object["years"][year] = [written_month]
+            archive_object["years"][year] = [month_object]
         else:
-            archive_object["years"][year] = archive_object["years"][year] + [written_month]
+            archive_object["years"][year] = archive_object["years"][year] + [month_object]
 
     print("Generating Archive Page at /archive/")
 
