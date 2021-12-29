@@ -36,7 +36,7 @@ def create_non_post_files(all_directories, pages_created_count, site_config):
     """
         Create all individual files (i.e. about.html) that aren't posts.
     """
-    do_not_process = ("_posts", "_layouts", "_site", "assets", "_includes", "_drafts")
+    do_not_process = ("_posts", "_layouts", "_site", "assets", "_includes", "_drafts", "_wiki")
 
     for directory in all_directories:
         directory_name = BASE_DIR + "/" + directory
@@ -201,7 +201,7 @@ def create_template(path, **kwargs):
     if len(sys.argv) > 1 and sys.argv[1] == "--retro":
         template = template.replace('<div id="main">', '<div id="main" class="flex_right_home">')
 
-    soup = BeautifulSoup(template, "html.parser")
+    # soup = BeautifulSoup(template, "html.parser")
 
     # all links
     # all_links = soup.find_all("a")
@@ -391,6 +391,26 @@ def process_page(
 
     return site_config
 
+def process_wiki_files(wiki_files, pages_created_count, site_config, post_type=""):
+    # order files in alphabetical order
+    for file in reversed(sorted(wiki_files, key=lambda s: "".join([char for char in s if char.isnumeric()]))):
+        f = "_wiki" + "/" + file
+
+        if os.path.isdir(f):
+            continue
+
+        if f.endswith("." + post_type):
+            site_config = process_page(
+                "_wiki",
+                f,
+                site_config,
+                "wiki"
+            )
+
+            pages_created_count += 1
+
+    return site_config, pages_created_count
+
 def create_posts(pages_created_count, site_config):
     """
         Get all posts and execute process_page function to create them.
@@ -433,6 +453,17 @@ def create_posts(pages_created_count, site_config):
         previous_page = path
 
         pages_created_count += 1
+
+    # get files in wiki directory, recursively
+    wiki_files = os.listdir("_wiki")
+
+    # process markdown files
+    site_config, pages_created_count = process_wiki_files(wiki_files, pages_created_count, site_config, post_type="md")
+
+    print([post["url"] for post in site_config["wiki"]])
+
+    # process html index files
+    site_config, pages_created_count = process_wiki_files(wiki_files, pages_created_count, site_config, post_type="html")
 
     return site_config, pages_created_count
 
