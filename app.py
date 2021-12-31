@@ -2,11 +2,13 @@ import os
 import sys
 import json
 import shutil
+import cProfile
 import datetime
 import frontmatter
 import markdown
 import jinja2
 import yaml
+import concurrent.futures
 from bs4 import BeautifulSoup
 import feeds
 import create_archives
@@ -55,13 +57,13 @@ def create_non_post_files(all_directories, pages_created_count, site_config):
 
             file_name = f.replace(directory_name, "")
 
-            extension = file_name.split(".")[-1]
-
             # do not copy dotfiles into site
             # also do not create archive.html file as that is created later
 
             if file_name.startswith("."):
                 continue
+
+            extension = file_name.split(".")[-1]
 
             # the archive page is created separately in the create_archive files
             if file_name == "/archive.html":
@@ -92,7 +94,10 @@ def create_template(path, **kwargs):
         Create a full page from a jinja2 template and its associated front matter.
     """
 
-    template_front_matter = frontmatter.load(path)
+    if path.startswith("_layouts"):
+        template_front_matter = frontmatter.loads(kwargs["site"]["layouts"][path.split("/")[-1]])
+    else:
+        template_front_matter = frontmatter.load(path)
 
     loader = jinja2.FileSystemLoader(searchpath="./")
 
@@ -179,7 +184,10 @@ def create_template(path, **kwargs):
         template_front_matter.metadata["layout"] = "retro"
 
     if template_front_matter.metadata.get("layout"):
-        parent_front_matter = frontmatter.load("_layouts/" + template_front_matter.metadata["layout"] + ".html")
+        if type(kwargs["site"]) == dict:
+            parent_front_matter = frontmatter.loads(kwargs["site"]["layouts"][template_front_matter.metadata["layout"] + ".html"])
+        else:
+            parent_front_matter = frontmatter.load("_layouts/" + template_front_matter.metadata["layout"] + ".html")
         parent_template = template.from_string(parent_front_matter.content)
 
         if len(sys.argv) > 1 and sys.argv[1] == "--retro" \
@@ -229,8 +237,8 @@ def process_page(
     
     if previous_page:
         front_matter.metadata["previous"] = {
-            "title": frontmatter.load(previous_page).metadata["title"],
-            "url": previous_page.replace(directory_name, "")
+            "title": previous_page.metadata["title"],
+            "url": previous_page.metadata["url"]
         }
 
     else:
@@ -275,8 +283,10 @@ def process_page(
     # use first sentence for meta description
     front_matter.metadata["meta_description"] = "".join(front_matter.metadata["excerpt"].split(". ")[0]).replace(" @", "") + "..."
     front_matter.metadata["description"] = " ".join([sentence.text for sentence in soup.find_all("p")[:1]]).replace(" @", "")
+
+    layout_types = ["like", "bookmark", "repost", "webmention", "note", "watche"]
         
-    if front_matter.metadata["layout"].rstrip("s").lower() in ["like", "bookmark", "repost", "webmention", "note", "watche"]:
+    if front_matter.metadata["layout"].rstrip("s").lower() in layout_types:
         site_config[front_matter.metadata["layout"].rstrip("s")] = site_config[front_matter.metadata["layout"].rstrip("s")] + [front_matter.metadata]
 
     print("Generating " + file_name)
@@ -389,7 +399,7 @@ def process_page(
         elif g[1].rstrip("s") in directory_name:
             site_config[g[1]] = site_config[g[1]] + [front_matter.metadata]
 
-    return site_config
+    return site_config, front_matter
 
 def process_wiki_files(wiki_files, pages_created_count, site_config, post_type=""):
     # order files in alphabetical order
@@ -400,7 +410,7 @@ def process_wiki_files(wiki_files, pages_created_count, site_config, post_type="
             continue
 
         if f.endswith("." + post_type):
-            site_config = process_page(
+            site_config, _ = process_page(
                 "_wiki",
                 f,
                 site_config,
@@ -439,7 +449,7 @@ def create_posts(pages_created_count, site_config):
             next_post_url = None
             next_post = None
 
-        site_config = process_page(
+        site_config, previous_page_contents = process_page(
             post_directory,
             path,
             site_config,
@@ -450,7 +460,7 @@ def create_posts(pages_created_count, site_config):
             person_tags
         )
 
-        previous_page = path
+        previous_page = previous_page_contents
 
         pages_created_count += 1
 
@@ -459,8 +469,6 @@ def create_posts(pages_created_count, site_config):
 
     # process markdown files
     site_config, pages_created_count = process_wiki_files(wiki_files, pages_created_count, site_config, post_type="md")
-
-    print([post["url"] for post in site_config["wiki"]])
 
     # process html index files
     site_config, pages_created_count = process_wiki_files(wiki_files, pages_created_count, site_config, post_type="html")
@@ -526,12 +534,20 @@ def main():
     site_config["years"] = []
     site_config["categories"] = {}
     site_config["series_posts"] = []
+    site_config["layouts"] = {}
 
     if site_config.get("groups"):
         for group in site_config["groups"]:
             site_config[group] = []
 
-    site_config, pages_created_count = create_posts(pages_created_count, site_config) 
+    # open all layouts files and save them to memory
+    layouts = os.listdir("_layouts")
+
+    for l in layouts:
+        with open("_layouts/" + l, "r") as file:
+            site_config["layouts"][l] = file.read()
+
+    site_config, pages_created_count = create_posts(pages_created_count, site_config)
 
     posts = site_config["posts"]
 
@@ -566,11 +582,18 @@ def main():
             os.rename("_site/category/post", "_site/posts")
 
         if "pagination" in site_config["auto_generate"]:
-            site_config, pages_created_count = create_archives.create_pagination_pages(
-                site_config,
-                OUTPUT,
-                pages_created_count
-            )
+            with concurrent.futures.ThreadPoolExecutor(max_workers=15) as executor:
+                futures = []
+
+                for category, entries in site_config["categories"].items():
+                    if category.lower() != "post":
+                        futures.append(executor.submit(create_archives.create_category_pages, site_config, OUTPUT, pages_created_count, entries, category))
+
+                for future in concurrent.futures.as_completed(futures):
+                    try:
+                        pages_created_count += 1
+                    except Exception as exc:
+                        print(exc)
 
         if "date_archive" in site_config["auto_generate"]:
             site_config, pages_created_count = create_archives.create_date_archive_pages(
@@ -619,6 +642,7 @@ def slugify(post_path):
     return "".join([char for char in post_path.replace(" ", "-") if char.isalnum() or char in ALLOWED_SLUG_CHARS]).replace(".md", ".html")
 
 if __name__ == "__main__":
+    # cProfile.run("main()", filename="profile.txt")
     main()
 
     end_time = datetime.datetime.now()
