@@ -274,6 +274,8 @@ def process_page(
 
     soup = BeautifulSoup(front_matter.content, "lxml")
 
+    as_text = soup.get_text()
+
     images = soup.find_all("img")
 
     if images:
@@ -297,7 +299,34 @@ def process_page(
 
     print("Generating " + file_name)
 
-    if page_type == "post":
+    if not front_matter.metadata.get("title") and len(front_matter.get("categories", [])) > 0:
+        title = front_matter.metadata["categories"][-1]
+        
+        front_matter.metadata["title"] = title.replace("-", " ").title()
+    elif not front_matter.metadata.get("title"):
+        front_matter.metadata["title"] = "Post by James"
+
+    if type(front_matter.metadata.get("categories", [])) == list:
+        front_matter.metadata["categories"] = front_matter.metadata.get("categories", []) + front_matter.metadata.get("category", [])
+
+    if "Note" in front_matter.metadata["categories"]:
+        hashtags = re.findall(r"#(\w+)", as_text)
+
+        for h in hashtags:
+            front_matter.content = front_matter.content.replace("#" + h, "<a href='/tags/" + h + "'>#" + h + "</a>")
+
+        hashtags = [tag.lower() for tag in hashtags]
+
+        if len(hashtags) > 0:
+            front_matter.metadata["tags"] = front_matter.metadata.get("tags", []) + hashtags
+
+        for tag in front_matter.metadata.get("tags", []):
+            if site_config["tags"].get(tag) is None:
+                site_config["tags"][tag] = [front_matter.metadata]
+            else:
+                site_config["tags"][tag] = site_config["tags"][tag] + [front_matter.metadata]
+
+    if page_type == "post" or "note" in front_matter.metadata["categories"]:
         path_to_save = OUTPUT + "/" + file_name.replace(BASE_DIR, "").strip("/")
 
         file = file_name.split("/")[-1]
@@ -316,10 +345,13 @@ def process_page(
 
         front_matter.metadata["date"] = datetime.datetime.strptime(year + "-" + month + "-" + day, "%Y-%m-%d")
 
-        if not os.path.exists(OUTPUT + "/" + year + "/" + month + "/" + day):
-            os.makedirs(OUTPUT + "/" + year + "/" + month + "/" + day)
-        
-        path_to_save = OUTPUT + "/" + year + "/" + month + "/" + day + "/" + "-".join(file.split("-")[3:]).split(".")[0] + "/index.html"
+        if page_type == "post":
+            if not os.path.exists(OUTPUT + "/" + year + "/" + month + "/" + day):
+                os.makedirs(OUTPUT + "/" + year + "/" + month + "/" + day)
+            
+            path_to_save = OUTPUT + "/" + year + "/" + month + "/" + day + "/" + "-".join(file.split("-")[3:]).split(".")[0] + "/index.html"
+        else:
+            path_to_save = OUTPUT + "/" + file_name.strip("/").replace("templates/", "").replace("_", "").replace(".md", "") + "/index.html"
     else:
         path_to_save = OUTPUT + "/" + file_name.strip("/").replace("templates/", "").replace("_", "").replace(".md", "") + "/index.html"
 
@@ -335,12 +367,12 @@ def process_page(
 
     front_matter.metadata["url"] = url
     front_matter.metadata["slug"] = url
-    front_matter.metadata["date_published"] = feeds.get_date_published(file_name.split("/")[-1])
+    front_matter.metadata["published"] = feeds.get_published(file_name.split("/")[-1])
 
     try:
-        front_matter.metadata["long_date"] = datetime.datetime.strptime(front_matter.metadata["date_published"], "%Y-%m-%dT%H:%M:%S-00:00").strftime("%B %d, %Y")
+        front_matter.metadata["full_date"] = datetime.datetime.strptime(front_matter.metadata["published"], "%Y-%m-%dT%H:%M:%S-00:00")
     except:
-        front_matter.metadata["long_date"] = ""
+        front_matter.metadata["full_date"] = front_matter.metadata["published"]
 
     front_matter.metadata["content"] = front_matter.content
 
@@ -403,11 +435,6 @@ def process_page(
             site_config[g[1]] = site_config[g[1]] + [front_matter.metadata]
         elif g[1].rstrip("s") in directory_name:
             site_config[g[1]] = site_config[g[1]] + [front_matter.metadata]
-
-    if not front_matter.metadata.get("title"):
-        title = front_matter.metadata["category"][-1]
-        
-        front_matter.metadata["title"] = title.replace("-", " ").title()
 
     return site_config, front_matter
 
@@ -513,7 +540,10 @@ def main():
 
     site_config["months"] = []
     site_config["years"] = []
+
     site_config["categories"] = {}
+    site_config["tags"] = {}
+
     site_config["series_posts"] = []
     site_config["layouts"] = {}
 
@@ -553,9 +583,16 @@ def main():
         if "category" in site_config["auto_generate"]:
             site_config, pages_created_count = create_archives.create_category_pages(
                 site_config,
-                BASE_DIR,
                 OUTPUT,
-                pages_created_count
+                pages_created_count,
+                page_type="category"
+            )
+
+            site_config, pages_created_count = create_archives.create_category_pages(
+                site_config,
+                OUTPUT,
+                pages_created_count,
+                page_type="tag"
             )
 
             # move _site/category/post to _site/posts/

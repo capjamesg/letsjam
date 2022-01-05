@@ -8,14 +8,20 @@ from config import ALLOWED_SLUG_CHARS
 
 def long_date(date):
     if type(date) is str:
-        date = datetime.datetime.strptime(date, "%Y-%m-%dT%H:%M:%S.%f")
+        date = datetime.datetime.strptime(date, "%Y-%m-%dT%H:%M:%S-00:00")
 
     return date.strftime("%B %d, %Y")
 
 def date_to_xml_string(date):
+    if type(date) is str:
+        date = datetime.datetime.strptime(date, "%Y-%m-%dT%H:%M:%S-00:00")
+        
     return date.strftime("%Y-%m-%dT%H:%M:%S")
 
 def archive_date(date):
+    if type(date) is str:
+        date = datetime.datetime.strptime(date, "%Y-%m-%dT%H:%M:%S-00:00")
+
     return date.strftime("%Y/%m")
 
 def slugify(post_path):
@@ -144,11 +150,17 @@ def create_pagination_pages(site_config, output, pages_created_count, entries, c
 
     return site_config, pages_created_count
 
-def create_category_pages(site_config, base_dir, output, pages_created_count):
+def create_category_pages(site_config, output, pages_created_count, page_type="category"):
     """
         Creates category pages for each category specified in post "categories" values.
     """
-    for category, entries in site_config["categories"].items():
+
+    if page_type == "category":
+        iterator = site_config["categories"].items()
+    else:
+        iterator = site_config["tags"].items()
+
+    for category, entries in iterator:
         front_matter = frontmatter.loads(site_config["layouts"]["category.html"])
 
         template_name = front_matter["layout"]
@@ -162,14 +174,14 @@ def create_category_pages(site_config, base_dir, output, pages_created_count):
                 "total_pages": number_of_pages,
                 "previous_page": increment - 1,
                 "next_page": increment + 1,
-                "previous_page_path": "/category/" + slug + "/" + str(increment - 1) + "/",
-                "next_page_path": "/category/" + slug + "/" + str(increment + 1) + "/"
+                "previous_page_path": f"/{page_type}/" + slug + "/" + str(increment - 1) + "/",
+                "next_page_path": f"/{page_type}/" + slug + "/" + str(increment + 1) + "/"
             }
 
             if increment - 1 <= 0:
-                paginator["previous_page_path"] = "/category/" + slug + "/2/"
+                paginator["previous_page_path"] = f"/{page_type}/" + slug + "/2/"
             else:
-                paginator["previous_page_path"] = "/category/" + slug + "/" + str(increment - 1) + ".html"
+                paginator["previous_page_path"] = f"/{page_type}/" + slug + "/" + str(increment - 1) + ".html"
 
             template_string = site_config["layouts"][template_name + ".html"]
             
@@ -179,7 +191,7 @@ def create_category_pages(site_config, base_dir, output, pages_created_count):
                 "title": category,
                 "category": category,
                 "posts": entries[increment * 10:increment * 10 + 10],
-                "url": "/category/" + slug + "/" + str(increment) + ".html",
+                "url": f"/{page_type}/" + slug + "/" + str(increment) + ".html",
             }
 
             rendered_front_matter = jinja2.Environment(loader=loader)
@@ -213,15 +225,15 @@ def create_category_pages(site_config, base_dir, output, pages_created_count):
                     paginator=paginator
                 )
 
-            print(f"Generating {category} Category Page")
+            print(f"Generating {category} {page_type} Page")
 
             increment = str(increment)
 
             category = category.lower().replace(" ", "-").replace("(", "").replace(")", "").replace("'", "")
 
             save_archive_file(
-                output + "/category/" + category + "/" + increment + "/",
-                output + "/category/" + category + "/",
+                output + f"/{page_type}/" + category + "/" + increment + "/",
+                output + f"/{page_type}/" + category + "/",
                 increment,
                 main_page_content
             )
