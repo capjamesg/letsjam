@@ -13,6 +13,7 @@ from bs4 import BeautifulSoup
 import feeds
 import create_archives
 from config import BASE_DIR, OUTPUT, ALLOWED_SLUG_CHARS
+import re
 
 start_time = datetime.datetime.now()
 
@@ -38,7 +39,7 @@ def create_non_post_files(all_directories, pages_created_count, site_config):
     """
         Create all individual files (i.e. about.html) that aren't posts.
     """
-    do_not_process = ("_posts", "_layouts", "_site", "assets", "_includes", "_drafts", "_wiki")
+    do_not_process = ("_posts", "_layouts", "_site", "assets", "_includes", "_drafts")
 
     for directory in all_directories:
         directory_name = BASE_DIR + "/" + directory
@@ -273,6 +274,11 @@ def process_page(
 
     soup = BeautifulSoup(front_matter.content, "lxml")
 
+    images = soup.find_all("img")
+
+    if images:
+        front_matter.metadata["image"] = [images[0].get("src", "")]
+
     # first paragraph sentences will be considered "excerpt" value
 
     # .replace(" @", "") removes @ mentions
@@ -386,10 +392,9 @@ def process_page(
         ("Webmention", "webmentions"),
         ("Reply", "webmentions"),
         ("Repost", "reposts"),
-        ("Drinking", "drinking"),
-        ("Coffee", "drinking"),
         ("Watch", "watches"),
-        ("Wiki", "wiki")
+        ("Wiki", "wiki"),
+        ("Note", "notes"),
     )
 
     for g in groups:
@@ -399,27 +404,12 @@ def process_page(
         elif g[1].rstrip("s") in directory_name:
             site_config[g[1]] = site_config[g[1]] + [front_matter.metadata]
 
+    if not front_matter.metadata.get("title"):
+        title = front_matter.metadata["category"][-1]
+        
+        front_matter.metadata["title"] = title.replace("-", " ").title()
+
     return site_config, front_matter
-
-def process_wiki_files(wiki_files, pages_created_count, site_config, post_type=""):
-    # order files in alphabetical order
-    for file in reversed(sorted(wiki_files, key=lambda s: "".join([char for char in s if char.isnumeric()]))):
-        f = "_wiki" + "/" + file
-
-        if os.path.isdir(f):
-            continue
-
-        if f.endswith("." + post_type):
-            site_config, _ = process_page(
-                "_wiki",
-                f,
-                site_config,
-                "wiki"
-            )
-
-            pages_created_count += 1
-
-    return site_config, pages_created_count
 
 def create_posts(pages_created_count, site_config):
     """
@@ -463,15 +453,6 @@ def create_posts(pages_created_count, site_config):
         previous_page = previous_page_contents
 
         pages_created_count += 1
-
-    # get files in wiki directory, recursively
-    wiki_files = os.listdir("_wiki")
-
-    # process markdown files
-    site_config, pages_created_count = process_wiki_files(wiki_files, pages_created_count, site_config, post_type="md")
-
-    # process html index files
-    site_config, pages_created_count = process_wiki_files(wiki_files, pages_created_count, site_config, post_type="html")
 
     return site_config, pages_created_count
 
@@ -623,7 +604,7 @@ def main():
 
     # remove config files from _site
     for file in os.listdir("_site"):
-        if file.endswith((".pyc", ".cfg")):
+        if file.endswith((".pyc", ".cfg", ".log")) or file.startswith("."):
             os.remove("_site/" + file)
 
     print("Pages generated: " + str(pages_created_count))

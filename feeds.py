@@ -1,6 +1,8 @@
 import json
 import datetime
 import os
+import re
+from bs4 import BeautifulSoup
 from feedgen.feed import FeedGenerator
 
 def get_date_published(url):
@@ -35,18 +37,17 @@ def create_feeds(site_config, posts):
         ("bookmarks.jf2", "James' Coffee Blog - Bookmarks", "bookmarks"),
         ("likes.jf2", "James' Coffee Blog - Likes", "likes"),
         ("replies.jf2", "James' Coffee Blog - Replies", "webmentions"),
-        ("coffee.jf2", "James' Coffee Blog - Coffee Log", "drinking"),
         ("bookmarks.json", "James' Coffee Blog - Bookmarks", "bookmarks"),
         ("likes.json", "James' Coffee Blog - Likes", "likes"),
         ("replies.json", "James' Coffee Blog - Replies", "webmentions"),
-        ("coffee.json", "James' Coffee Blog - Coffee Log", "drinking"),
         ("bookmarks.xml", "James' Coffee Blog - Bookmarks", "bookmarks"),
         ("likes.xml", "James' Coffee Blog - Likes", "likes"),
         ("replies.xml", "James' Coffee Blog - Replies", "webmentions"),
-        ("coffee.xml", "James' Coffee Blog - Coffee Log", "drinking"),
         ("posts.jf2", "James' Coffee Blog - Posts", "posts"),
         ("posts.json", "James' Coffee Blog - Posts", "posts"),
-        ("posts.xml", "James' Coffee Blog - Posts", "posts")
+        ("posts.xml", "James' Coffee Blog - Posts", "posts"),
+        ("notes.json", "James' Coffee Blog - Notes", "notes"),
+        ("notes.xml", "James' Coffee Blog - Notes", "notes"),
     )
 
     os.makedirs("_site/feeds")
@@ -77,6 +78,12 @@ def create_feeds(site_config, posts):
             }
 
             for post in feed_items:
+                parsed = BeautifulSoup(post["content"], "lxml")
+
+                as_text = parsed.get_text()
+
+                hashtags = re.findall(r"#(\w+)", as_text)
+
                 entry = {
                     "type": "entry",
                     "url": site_config["baseurl"] + post["url"],
@@ -134,10 +141,20 @@ def create_feeds(site_config, posts):
                 else:
                     entry["title"] = post["url"]
 
+                if hashtags:
+                    entry["category"] = hashtags
+
+                if post.get("categories"):
+                    entry["category"] = post["categories"]
+
                 if post.get("content"):
                     entry["content"] = {
                         "text": post["content"]
                     }
+
+                images = parsed.find_all("img")
+
+                entry["photo"] = [photo.src for photo in images]
 
                 full_jf2_feed["items"].append(entry)
 
@@ -153,10 +170,16 @@ def create_feeds(site_config, posts):
                     "url": site_config["baseurl"],
                     "avatar": site_config["avatar"]
                 },
-                "version": "https://jsonfeed.org/version/1",
+                "version": "https://jsonfeed.org/version/1.1",
                 "items": []
             }
             for post in feed_items:
+                parsed = BeautifulSoup(post["content"], "lxml")
+
+                as_text = parsed.get_text()
+
+                hashtags = re.findall(r"#(\w+)", as_text)
+
                 entry = {
                     "url": site_config["baseurl"] + post["url"],
                     "id": site_config["baseurl"] + post["url"],
@@ -165,6 +188,7 @@ def create_feeds(site_config, posts):
                         "name": site_config["author"]
                     },
                     "content_html": post["content"],
+                    "content_text": as_text,
                     "date_published": post["date_published"]
                 }
 
@@ -176,8 +200,16 @@ def create_feeds(site_config, posts):
                 if post.get("categories"):
                     entry["tags"] = post["categories"]
 
-                if post.get("title"):
+                if hashtags:
+                    entry["tags"] = hashtags
+
+                if post.get("title") and group == "posts":
                     entry["title"] = post["title"]
+
+                images = parsed.find_all("img")
+
+                if images and len(images) > 0:
+                    entry["image"] = images[0]["src"]
 
                 full_json_feed["items"].append(entry)
 

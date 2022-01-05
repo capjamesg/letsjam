@@ -7,6 +7,9 @@ from app import create_template
 from config import ALLOWED_SLUG_CHARS
 
 def long_date(date):
+    if type(date) is str:
+        date = datetime.datetime.strptime(date, "%Y-%m-%dT%H:%M:%S.%f")
+
     return date.strftime("%B %d, %Y")
 
 def date_to_xml_string(date):
@@ -231,7 +234,7 @@ def create_list_pages(base_dir, site_config, output, pages_created_count):
     """
         Creates pages for specified groups (i.e. "likes").
     """
-    list_pages = ["likes", "bookmarks", "webmentions", "drinking", "watches"]
+    list_pages = ["likes", "bookmarks", "webmentions", "notes"]
     
     for page in list_pages:
         number_of_pages = int(len(site_config[page]) / 10) + 1
