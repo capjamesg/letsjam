@@ -142,9 +142,7 @@ logs/*
 profile/*
 data/*
 charts/*
+_site/
 
-_*
-assets
-templates
 webmentions
 _*/*
