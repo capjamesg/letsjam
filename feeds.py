@@ -5,16 +5,16 @@ import re
 from bs4 import BeautifulSoup
 from feedgen.feed import FeedGenerator
 
-def get_date_published(url):
-    date_published = ""
+def get_published_date(url):
+    published = ""
 
     if url.count("-") > 2 and url.split("-")[1].isnumeric():
         year, month, day = url.split("-")[:3]
 
-        date_published = f"{year}-{month}-{day}T00:00:00-00:00"
+        published = f"{year}-{month}-{day}T00:00:00-00:00"
 
     try:
-        formatted_date = datetime.datetime.strptime(date_published, "%Y-%m-%dT%H:%M:%S%z").strftime("%B %d, %Y")
+        formatted_date = datetime.datetime.strptime(published, "%Y-%m-%dT%H:%M:%S%z").strftime("%B %d, %Y")
     except:
         formatted_date = ""
 
@@ -93,7 +93,7 @@ def create_feeds(site_config, posts):
                         "name": site_config["title"],
                         "photo": site_config["avatar"]
                     },
-                    "published": post["date_published"],
+                    "published": post["full_date"],
                     "post-type": post_type
                 }
 
@@ -189,7 +189,7 @@ def create_feeds(site_config, posts):
                     },
                     "content_html": post["content"],
                     "content_text": as_text,
-                    "date_published": post["date_published"]
+                    "published": post["full_date"]
                 }
 
                 image = retrieve_image(post, site_config)
@@ -242,9 +242,9 @@ def create_feeds(site_config, posts):
                 feed_entry.description(post["excerpt"])
                 feed_entry.author({"name": site_config["author"]})
 
-                if post["date_published"] != "":
+                if post["published"] != "":
                     try:
-                        feed_entry.published(post["date_published"])
+                        feed_entry.published(post["published"])
                     except:
                         continue
 
