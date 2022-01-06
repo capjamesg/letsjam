@@ -163,14 +163,14 @@ def create_feeds(site_config, posts):
 
         elif feed_name.endswith(".json"):
             full_json_feed = {
-                "feed_url": site_config["baseurl"] + "/" + feed_name,
+                "version": "https://jsonfeed.org/version/1.1",
+                "feed_url": site_config["baseurl"] + "/feeds/" + feed_name,
                 "title": feed_title,
                 "home_page_url": site_config["baseurl"],
-                "author": {
+                "authors": [{
                     "url": site_config["baseurl"],
                     "avatar": site_config["avatar"]
-                },
-                "version": "https://jsonfeed.org/version/1.1",
+                }],
                 "items": []
             }
             for post in feed_items:
@@ -183,10 +183,10 @@ def create_feeds(site_config, posts):
                 entry = {
                     "url": site_config["baseurl"] + post["url"],
                     "id": site_config["baseurl"] + post["url"],
-                    "author": {
+                    "authors": [{
                         "url": site_config["baseurl"],
                         "name": site_config["author"]
-                    },
+                    }],
                     "content_html": post["content"],
                     "content_text": as_text,
                     "published": post["full_date"]
