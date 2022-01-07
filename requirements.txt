@@ -1,0 +1,14 @@
+beautifulsoup4==4.10.0
+bs4==0.0.1
+feedgen==0.9.0
+importlib-metadata==4.8.2
+Jinja2==3.0.3
+lxml==4.6.4
+Markdown==3.3.6
+MarkupSafe==2.0.1
+python-dateutil==2.8.2
+python-frontmatter==1.0.0
+PyYAML==5.1
+six==1.16.0
+soupsieve==2.3.1
+zipp==3.6.0
