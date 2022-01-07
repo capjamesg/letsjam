@@ -2,9 +2,11 @@ import json
 import datetime
 import os
 import re
-from config import FEEDS
+
 from bs4 import BeautifulSoup
 from feedgen.feed import FeedGenerator
+
+from config import FEEDS
 
 def get_published_date(url):
     published = ""
@@ -175,7 +177,7 @@ def create_feeds(site_config, posts):
                     }],
                     "content_html": post["content"],
                     "content_text": as_text,
-                    "published_date": post["full_date"]
+                    "date_published": post["full_date"]
                 }
 
                 image = retrieve_image(post, site_config)
@@ -225,7 +227,7 @@ def create_feeds(site_config, posts):
                     feed_entry.title(site_config["baseurl"] + post["url"])
                 
                 feed_entry.link(link={"href": site_config["baseurl"] + post["url"]})
-                feed_entry.description(post["excerpt"])
+                feed_entry.description(post["content"])
                 feed_entry.author({"name": site_config["author"]})
 
                 if post["published"] != "":

@@ -192,6 +192,7 @@ def create_category_pages(site_config, output, pages_created_count, page_type="c
                 "category": category,
                 "posts": entries[increment * 10:increment * 10 + 10],
                 "url": f"/{page_type}/" + slug + "/" + str(increment) + ".html",
+                "number": increment
             }
 
             rendered_front_matter = jinja2.Environment(loader=loader)
@@ -229,11 +230,11 @@ def create_category_pages(site_config, output, pages_created_count, page_type="c
 
             increment = str(increment)
 
-            category = category.lower().replace(" ", "-").replace("(", "").replace(")", "").replace("'", "")
+            slug = category.lower().replace(" ", "-").replace("(", "").replace(")", "").replace("'", "")
 
             save_archive_file(
-                output + f"/{page_type}/" + category + "/" + increment + "/",
-                output + f"/{page_type}/" + category + "/",
+                output + f"/{page_type}/" + slug + "/" + increment + "/",
+                output + f"/{page_type}/" + slug + "/",
                 increment,
                 main_page_content
             )
@@ -272,7 +273,11 @@ def create_list_pages(base_dir, site_config, output, pages_created_count):
 
             template = create_template(
                 base_dir + "/templates/" + page + ".html",
-                page={"posts": posts, "title": page.title(), "url": "/" + page + "/"},
+                page={
+                    "posts": posts,
+                    "title": page.title(),
+                    "url": "/" + page + "/"
+                },
                 site=site_config,
                 paginator=paginator
             )
@@ -292,7 +297,10 @@ def create_list_pages(base_dir, site_config, output, pages_created_count):
 
     template = create_template(
         base_dir + "/templates/all_likes.html",
-        page={"posts": site_config["likes"], "url": "/likes/all/"},
+        page={
+            "posts": site_config["likes"],
+            "url": "/likes/all/"
+        },
         site=site_config,
         paginator=paginator
     )
@@ -359,7 +367,7 @@ def create_date_archive_pages(site_config, output, pages_created_count, posts):
                 for increment in range(0, number_of_pages)
             ]
 
-            for future in concurrent.futures.as_completed(future_to_page):
+            for _ in concurrent.futures.as_completed(future_to_page):
                 try:
                     pages_created_count += 1
                 except Exception as exc:
@@ -388,7 +396,7 @@ def create_date_archive_pages(site_config, output, pages_created_count, posts):
                 for increment in range(0, number_of_pages)
             ]
 
-            for future in concurrent.futures.as_completed(future_to_page):
+            for _ in concurrent.futures.as_completed(future_to_page):
                 try:
                     pages_created_count += 1
                 except Exception as exc:

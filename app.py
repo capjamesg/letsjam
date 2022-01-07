@@ -572,12 +572,15 @@ def main():
     categories = site_config["categories"].keys()
 
     for category in categories:
-        if category.lower() != "post":
-            site_config["categories"][category].reverse()
+        site_config["categories"][category].reverse()
 
     render_series_fragment(site_config)
 
-    site_config, pages_created_count = create_non_post_files(all_directories, pages_created_count, site_config)
+    site_config, pages_created_count = create_non_post_files(
+        all_directories,
+        pages_created_count,
+        site_config
+    )
 
     os.mkdir("_site/category")
 
@@ -597,19 +600,23 @@ def main():
                 page_type="tag"
             )
 
-            # move _site/category/post to _site/posts/
-            # this contains the main post archive (as defined as articles with the category "Post")
-            os.rename("_site/category/post", "_site/posts")
-
         if "pagination" in site_config["auto_generate"]:
             with concurrent.futures.ThreadPoolExecutor(max_workers=15) as executor:
                 futures = []
 
                 for category, entries in site_config["categories"].items():
-                    if category.lower() != "post":
-                        futures.append(executor.submit(create_archives.create_category_pages, site_config, OUTPUT, pages_created_count, entries, category))
+                    futures.append(
+                        executor.submit(
+                            create_archives.create_category_pages,
+                            site_config,
+                            OUTPUT,
+                            pages_created_count,
+                            entries,
+                            category
+                        )
+                    )
 
-                for future in concurrent.futures.as_completed(futures):
+                for _ in concurrent.futures.as_completed(futures):
                     try:
                         pages_created_count += 1
                     except Exception as exc:
