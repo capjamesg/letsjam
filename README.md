@@ -165,4 +165,5 @@ This project is licensed under the [MIT License](LICENSE)
 
 ## Contributors
 
-- capjamesg
+- [capjamesg](https://github.com/capjamesg)
+- [binyamin](https://github.com/binyamin)
