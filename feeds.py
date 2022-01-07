@@ -2,6 +2,7 @@ import json
 import datetime
 import os
 import re
+from config import FEEDS
 from bs4 import BeautifulSoup
 from feedgen.feed import FeedGenerator
 
@@ -33,26 +34,11 @@ def retrieve_image(post, site_config):
     return image
 
 def create_feeds(site_config, posts):
-    feeds = (
-        ("bookmarks.jf2", "James' Coffee Blog - Bookmarks", "bookmarks"),
-        ("likes.jf2", "James' Coffee Blog - Likes", "likes"),
-        ("replies.jf2", "James' Coffee Blog - Replies", "webmentions"),
-        ("bookmarks.json", "James' Coffee Blog - Bookmarks", "bookmarks"),
-        ("likes.json", "James' Coffee Blog - Likes", "likes"),
-        ("replies.json", "James' Coffee Blog - Replies", "webmentions"),
-        ("bookmarks.xml", "James' Coffee Blog - Bookmarks", "bookmarks"),
-        ("likes.xml", "James' Coffee Blog - Likes", "likes"),
-        ("replies.xml", "James' Coffee Blog - Replies", "webmentions"),
-        ("posts.jf2", "James' Coffee Blog - Posts", "posts"),
-        ("posts.json", "James' Coffee Blog - Posts", "posts"),
-        ("posts.xml", "James' Coffee Blog - Posts", "posts"),
-        ("notes.json", "James' Coffee Blog - Notes", "notes"),
-        ("notes.xml", "James' Coffee Blog - Notes", "notes"),
-    )
+    feeds = FEEDS
 
     os.makedirs("_site/feeds")
 
-    for feed_name, feed_title, group in feeds:
+    for feed_name, feed_title, group, feed_type in feeds:
         if group == "posts":
             feed_items = posts[:10]
         else:
@@ -71,7 +57,7 @@ def create_feeds(site_config, posts):
 
         print("Creating feed: " + feed_name)
 
-        if feed_name.endswith(".jf2"):
+        if feed_type == "jf2":
             full_jf2_feed = {
                 "type": "feed",
                 "items": []
@@ -161,7 +147,7 @@ def create_feeds(site_config, posts):
             with open("_site/feeds/" + feed_name, "w+") as file:
                 file.write(json.dumps(full_jf2_feed))
 
-        elif feed_name.endswith(".json"):
+        elif feed_type == "json":
             full_json_feed = {
                 "version": "https://jsonfeed.org/version/1.1",
                 "feed_url": site_config["baseurl"] + "/feeds/" + feed_name,
@@ -189,7 +175,7 @@ def create_feeds(site_config, posts):
                     }],
                     "content_html": post["content"],
                     "content_text": as_text,
-                    "published": post["full_date"]
+                    "published_date": post["full_date"]
                 }
 
                 image = retrieve_image(post, site_config)
@@ -216,7 +202,7 @@ def create_feeds(site_config, posts):
             with open("_site/feeds/" + feed_name, "w+") as file:
                 file.write(json.dumps(full_json_feed))
 
-        elif feed_name.endswith(".xml"):
+        elif feed_type == "rss":
             full_feed = FeedGenerator()
             
             full_feed.id(site_config["baseurl"])

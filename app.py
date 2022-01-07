@@ -538,6 +538,8 @@ def main():
 
     site_config = yaml.load(open("config.yml", "r"), Loader=yaml.FullLoader)
 
+    site_config["pages"] = []
+
     site_config["months"] = []
     site_config["years"] = []
 

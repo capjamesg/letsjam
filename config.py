@@ -1,17 +1,11 @@
 site_config = {
     "title": "Blog Title",
     "posts": [],
-    "categories": {},
-    "months": [],
-    "years": [],
     "likes": [],
     "bookmarks": [],
     "replies": [],
-    "reposts": [],
-    "drinking": [],
     "rsvps": [],
     "baseurl": "https://example.com",
-    "pages": [],
     "webmentions": [],
     "wiki": []
 }
@@ -27,3 +21,7 @@ CATEGORY_PAGE_GENERATION = True
 PAGINATION_PAGE_GENERATION = True
 DATE_ARCHIVE_GENERATION = True
 LIST_PAGE_GENERATION = True
+
+FEEDS = (
+    ("bookmarks.xml", "Example Blog Posts", "posts", "rss"),
+)
