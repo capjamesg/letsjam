@@ -17,7 +17,7 @@ def get_published_date(url):
         published = f"{year}-{month}-{day}T00:00:00-00:00"
 
     try:
-        formatted_date = datetime.datetime.strptime(published, "%Y-%m-%dT%H:%M:%S%z").strftime("%B %d, %Y")
+        formatted_date = datetime.datetime.strptime(published, "%Y-%m-%dT%H:%M:%S%z")
     except:
         formatted_date = ""
 
@@ -103,7 +103,7 @@ def create_feeds(site_config, posts):
                     context_url = None
 
                 # show reply context in feed item
-                if post.get("context") and context_url != None:
+                if post.get("context") and context_url != None and post["context"].get("post_body"):
                     context = post.get("context")
 
                     entry["refs"] = {

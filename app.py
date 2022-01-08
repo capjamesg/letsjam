@@ -121,7 +121,7 @@ def create_template(path, **kwargs):
     # }
 
     if "person_tags" in kwargs.keys() and "page_type" in kwargs.keys() and \
-        (kwargs["page_type"] == "post" or kwargs["page_type"] == "webmention"):
+        (kwargs["page_type"] == "post"):
 
         person_tags = []
 
@@ -313,7 +313,7 @@ def process_page(
         hashtags = re.findall(r"#(\w+)", as_text)
 
         for h in hashtags:
-            front_matter.content = front_matter.content.replace("#" + h, "<a href='/tag/" + h + "'>#" + h + "</a>")
+            front_matter.content = front_matter.content.replace("#" + h, "<a href='/tag/" + h + "' rel='tag'>#" + h + "</a>")
 
         hashtags = [tag.lower() for tag in hashtags]
 
@@ -367,12 +367,14 @@ def process_page(
 
     front_matter.metadata["url"] = url
     front_matter.metadata["slug"] = url
-    front_matter.metadata["published"] = feeds.get_published_date(file_name.split("/")[-1])
+    published_date = feeds.get_published_date(file_name.split("/")[-1])
 
-    try:
-        front_matter.metadata["full_date"] = datetime.datetime.strptime(front_matter.metadata["published"], "%Y-%m-%dT%H:%M:%S-00:00")
-    except:
-        front_matter.metadata["full_date"] = datetime.datetime.fromtimestamp(os.stat(file_name).st_ctime).strftime('%Y-%m-%dT%H:%M:%S-00:00')
+    if isinstance(published_date, datetime.datetime):
+        front_matter.metadata["published"] = published_date.strftime("%B %d, %Y")
+        front_matter.metadata["full_date"] = published_date.strftime("%Y-%m-%dT%H:%M:%S-00:00")
+    else:
+        front_matter.metadata["published"] = ""
+        front_matter.metadata["full_date"] = ""
 
     front_matter.metadata["content"] = front_matter.content
 
