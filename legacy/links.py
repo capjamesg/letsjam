@@ -1,4 +1,5 @@
 import json
+
 import matplotlib.pyplot as plt
 import networkx as nx
 
@@ -9,7 +10,7 @@ Graph = nx.Graph()
 with open("all_links.json", "r") as f:
     for l in f.readlines():
         data = json.loads(l)
-        
+
         data["dst"] = data["dst"].split("/")[2].lower()
 
         Graph.add_node(data["dst"])

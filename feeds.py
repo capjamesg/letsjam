@@ -1,5 +1,5 @@
-import json
 import datetime
+import json
 import os
 import re
 
@@ -8,20 +8,23 @@ from feedgen.feed import FeedGenerator
 
 from config import FEEDS
 
-def get_published_date(url):
+
+def get_published_date(url, post_type, published):
     published = ""
 
-    if url.count("-") > 2 and url.split("-")[1].isnumeric():
-        year, month, day = url.split("-")[:3]
+    if post_type == "article":
+        if url.count("-") > 2 and url.split("-")[1].isnumeric():
+            year, month, day = url.split("-")[:3]
 
-        published = f"{year}-{month}-{day}T00:00:00-00:00"
+            published = f"{year}-{month}-{day} 00:00:00-00:00"
 
     try:
-        formatted_date = datetime.datetime.strptime(published, "%Y-%m-%dT%H:%M:%S%z")
+        formatted_date = datetime.datetime.strptime(published, "%Y-%m-%d %H:%M:%S%z")
     except:
         formatted_date = ""
 
     return formatted_date
+
 
 def retrieve_image(post, site_config):
     if post.get("image") and type(post["image"]) is str:
@@ -34,6 +37,7 @@ def retrieve_image(post, site_config):
         image = None
 
     return image
+
 
 def create_feeds(site_config, posts):
     feeds = FEEDS
@@ -48,7 +52,7 @@ def create_feeds(site_config, posts):
 
         if group == "likes":
             post_type = "like"
-        elif group == "webmentions":
+        elif group == "replies":
             post_type = "reply"
         elif group == "bookmarks":
             post_type = "bookmark"
@@ -60,10 +64,7 @@ def create_feeds(site_config, posts):
         print("Creating feed: " + feed_name)
 
         if feed_type == "jf2":
-            full_jf2_feed = {
-                "type": "feed",
-                "items": []
-            }
+            full_jf2_feed = {"type": "feed", "items": []}
 
             for post in feed_items:
                 parsed = BeautifulSoup(post["content"], "lxml")
@@ -79,10 +80,10 @@ def create_feeds(site_config, posts):
                     "author": {
                         "url": site_config["baseurl"],
                         "name": site_config["title"],
-                        "photo": site_config["avatar"]
+                        "photo": site_config["avatar"],
                     },
                     "published": post["full_date"],
-                    "post-type": post_type
+                    "post-type": post_type,
                 }
 
                 image = retrieve_image(post, site_config)
@@ -103,22 +104,24 @@ def create_feeds(site_config, posts):
                     context_url = None
 
                 # show reply context in feed item
-                if post.get("context") and context_url != None and post["context"].get("post_body"):
+                if (
+                    post.get("context")
+                    and context_url != None
+                    and post["context"].get("post_body")
+                ):
                     context = post.get("context")
 
                     entry["refs"] = {
                         "type": "entry",
                         "url": context_url,
-                        "content": {
-                            "text": context["post_body"]
-                        }
+                        "content": {"text": context["post_body"]},
                     }
 
                     if context.get("author_name") and context.get("author_url"):
                         entry["refs"]["author"] = {
                             "type": "card",
                             "url": context["author_url"],
-                            "name": context["author_name"]
+                            "name": context["author_name"],
                         }
 
                         if context.get("author_image"):
@@ -136,9 +139,7 @@ def create_feeds(site_config, posts):
                     entry["category"] = post["categories"]
 
                 if post.get("content"):
-                    entry["content"] = {
-                        "text": post["content"]
-                    }
+                    entry["content"] = {"text": post["content"]}
 
                 images = parsed.find_all("img")
 
@@ -155,11 +156,10 @@ def create_feeds(site_config, posts):
                 "feed_url": site_config["baseurl"] + "/feeds/" + feed_name,
                 "title": feed_title,
                 "home_page_url": site_config["baseurl"],
-                "authors": [{
-                    "url": site_config["baseurl"],
-                    "avatar": site_config["avatar"]
-                }],
-                "items": []
+                "authors": [
+                    {"url": site_config["baseurl"], "avatar": site_config["avatar"]}
+                ],
+                "items": [],
             }
             for post in feed_items:
                 parsed = BeautifulSoup(post["content"], "lxml")
@@ -171,13 +171,12 @@ def create_feeds(site_config, posts):
                 entry = {
                     "url": site_config["baseurl"] + post["url"],
                     "id": site_config["baseurl"] + post["url"],
-                    "authors": [{
-                        "url": site_config["baseurl"],
-                        "name": site_config["author"]
-                    }],
+                    "authors": [
+                        {"url": site_config["baseurl"], "name": site_config["author"]}
+                    ],
                     "content_html": post["content"],
                     "content_text": as_text,
-                    "date_published": post["full_date"]
+                    "date_published": post["full_date"],
                 }
 
                 image = retrieve_image(post, site_config)
@@ -206,7 +205,7 @@ def create_feeds(site_config, posts):
 
         elif feed_type == "rss":
             full_feed = FeedGenerator()
-            
+
             full_feed.id(site_config["baseurl"])
             full_feed.title(feed_title)
             full_feed.author(name=feed_title)
@@ -215,6 +214,8 @@ def create_feeds(site_config, posts):
             full_feed.subtitle(feed_title)
             full_feed.description(feed_title)
             full_feed.language("en")
+
+            feed_items.reverse()
 
             for post in feed_items:
                 feed_entry = full_feed.add_entry()
@@ -225,23 +226,25 @@ def create_feeds(site_config, posts):
                     feed_entry.title(post["title"])
                 else:
                     feed_entry.title(site_config["baseurl"] + post["url"])
-                
+
                 feed_entry.link(link={"href": site_config["baseurl"] + post["url"]})
                 feed_entry.description(post["content"])
                 feed_entry.author({"name": site_config["author"]})
 
-                if post["published"] != "":
+                if post["full_date"] != "":
                     try:
-                        feed_entry.published(post["published"])
+                        feed_entry.published(post["full_date"])
                     except:
                         continue
 
                 image = retrieve_image(post, site_config)
-                
+
                 if image != None:
                     feed_entry.enclosure(image, 0, "image/jpeg")
 
                 feed_entry.content(post["content"])
+
+                print(feed_entry.author)
 
             try:
                 with open("_site/feeds/" + feed_name, "w+") as file:
