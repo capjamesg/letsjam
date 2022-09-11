@@ -6,40 +6,29 @@ import frontmatter
 import jinja2
 
 from app import create_template
-from config import ALLOWED_SLUG_CHARS
+
+
+def list_archive_date(date):
+    if type(date) is str and "." in date:
+        date = date.replace(" ", "T")
+        date = datetime.datetime.strptime(date, "%Y-%m-%dT%H:%M:%S.%f")
+    elif type(date) is str:
+        date = date.replace(" ", "T")
+        date = datetime.datetime.strptime(date, "%Y-%m-%dT%H:%M:%S-00:00")
+
+    return date
 
 
 def long_date(date):
-    if type(date) is str and "." in date:
-        date = date.replace(" ", "T")
-        date = datetime.datetime.strptime(date, "%Y-%m-%dT%H:%M:%S.%f")
-    elif type(date) is str:
-        date = date.replace(" ", "T")
-        date = datetime.datetime.strptime(date, "%Y-%m-%dT%H:%M:%S-00:00")
-
-    return date.strftime("%B %d, %Y")
+    return list_archive_date(date).strftime("%B %d, %Y")
 
 
 def date_to_xml_string(date):
-    if type(date) is str and "." in date:
-        date = date.replace(" ", "T")
-        date = datetime.datetime.strptime(date, "%Y-%m-%dT%H:%M:%S.%f")
-    elif type(date) is str:
-        date = date.replace(" ", "T")
-        date = datetime.datetime.strptime(date, "%Y-%m-%dT%H:%M:%S-00:00")
-
-    return date.strftime("%Y-%m-%dT%H:%M:%S")
+    return list_archive_date(date).strftime("%Y-%m-%dT%H:%M:%S")
 
 
 def archive_date(date):
-    if type(date) is str and "." in date:
-        date = date.replace(" ", "T")
-        date = datetime.datetime.strptime(date, "%Y-%m-%dT%H:%M:%S.%f")
-    elif type(date) is str:
-        date = date.replace(" ", "T")
-        date = datetime.datetime.strptime(date, "%Y-%m-%dT%H:%M:%S-00:00")
-
-    return date.strftime("%Y/%m")
+    return list_archive_date(date).strftime("%Y/%m")
 
 
 def slugify(post_path):
@@ -47,7 +36,7 @@ def slugify(post_path):
         [
             char
             for char in post_path.replace(" ", "-")
-            if char.isalnum() or char in ALLOWED_SLUG_CHARS
+            if char.isalnum() or char in ["-", "/", ".", "_"]
         ]
     ).replace(".md", ".html")
 
@@ -84,6 +73,7 @@ def generate_archive_page(
         "previous_page": increment - 1,
         "next_page": increment + 1,
         "next_page_path": page_path_base + str(increment + 1),
+        "current_page": increment + 1
     }
 
     if increment - 1 <= 0:
@@ -128,72 +118,6 @@ def generate_archive_page(
     return pages_created_count
 
 
-def create_pagination_pages(
-    site_config, output, pages_created_count, entries, category
-):
-    number_of_pages = int(len(entries) / 10) + 1
-
-    for page in range(0, number_of_pages):
-        paginator = {
-            "total_pages": number_of_pages,
-            "previous_page": page - 1,
-            "next_page": page + 1,
-        }
-
-        slug = (
-            category.lower()
-            .replace(" ", "-")
-            .replace("(", "")
-            .replace(")", "")
-            .replace("'", "")
-        )
-
-        increment_value = page + 1
-
-        if increment_value - 1 <= 0:
-            paginator["previous_page_path"] = "/category/" + slug.lower() + "/"
-            paginator["next_page_path"] = "/category/" + slug.lower() + "/2/"
-        else:
-            paginator["previous_page_path"] = (
-                "/category/" + slug.lower() + "/" + str(increment_value - 1) + "/"
-            )
-            paginator["next_page_path"] = (
-                "/category/" + slug.lower() + "/" + str(increment_value + 1) + "/"
-            )
-
-        page_contents = site_config
-
-        page_contents["posts"] = entries[page * 10 : page * 10 + 10]
-        page_contents["category"] = category
-        page_contents["url"] = "/" + slug + "/" + str(page) + "/"
-
-        template = create_template(
-            "_layouts/category.html",
-            page=page_contents,
-            category=slug,
-            site=site_config,
-            paginator=paginator,
-        )
-
-        path_to_save = (
-            output + "/" + "category/" + category.lower() + "/" + str(page + 1) + "/"
-        )
-
-        path_to_save = slugify("/".join(path_to_save.split("/")[:-1]))
-
-        if not os.path.exists(path_to_save):
-            os.makedirs(path_to_save)
-
-        print(f"Generating {category} Archive Page ({path_to_save})")
-
-        with open(slugify(path_to_save + "/index.html"), "w+") as file:
-            file.write(template)
-
-        pages_created_count += 1
-
-    return site_config, pages_created_count
-
-
 def create_category_pages(
     site_config, output, pages_created_count, page_type="category"
 ):
@@ -203,11 +127,13 @@ def create_category_pages(
 
     if page_type == "category":
         iterator = site_config["categories"].items()
+        layout = "category.html"
     else:
         iterator = site_config["tags"].items()
+        layout = "tag.html"
 
     for category, entries in iterator:
-        front_matter = frontmatter.loads(site_config["layouts"]["category.html"])
+        front_matter = frontmatter.loads(site_config["layouts"][layout])
 
         template_name = front_matter["layout"]
 
@@ -236,13 +162,22 @@ def create_category_pages(
                 + "/"
                 + str(increment + 1)
                 + "/",
+                "current_page": increment + 1
             }
 
             if increment - 1 <= 0:
                 paginator["previous_page_path"] = f"/{page_type}/" + slug + "/2/"
             else:
                 paginator["previous_page_path"] = (
-                    f"/{page_type}/" + slug + "/" + str(increment - 1) + ".html"
+                    f"/{page_type}/" + slug + "/" + str(increment - 1) + "/"
+                )
+
+            if increment + 1 == number_of_pages:
+                paginator["next_page_path"] = ""
+                paginator["next_page"] = 0
+            else:
+                paginator["next_page_path"] = (
+                    "/category/" + slug + "/" + str(increment + 1) + "/"
                 )
 
             template_string = site_config["layouts"][template_name + ".html"]
@@ -253,7 +188,7 @@ def create_category_pages(
                 "title": category,
                 "category": category,
                 "posts": entries[increment * 10 : increment * 10 + 10],
-                "url": f"/{page_type}/" + slug + "/" + str(increment) + ".html",
+                "url": f"/{page_type}/" + slug + "/" + str(increment) + "/",
                 "number": increment,
             }
 
@@ -286,7 +221,7 @@ def create_category_pages(
 
             number_of_posts = len(entries)
 
-            sparkline = f"""<p>There are {number_of_posts} Posts in this category<br><embed src="/assets/sparkline.svg?{','.join([str(val) for val in data_points])}" height=45></p>"""
+            sparkline = f"""<p>There are {number_of_posts} Posts in this {page_type}<br><embed src="/assets/sparkline.svg?{','.join([str(val) for val in data_points])}" height=45></p>"""
 
             page["sparkline"] = sparkline
 
@@ -296,6 +231,7 @@ def create_category_pages(
             rendered_front_matter.filters["long_date"] = long_date
             rendered_front_matter.filters["date_to_xml_string"] = date_to_xml_string
             rendered_front_matter.filters["archive_date"] = archive_date
+            rendered_front_matter.filters["list_archive_date"] = list_archive_date
 
             rendered_front_matter = rendered_front_matter.from_string(
                 front_matter.content
@@ -309,6 +245,7 @@ def create_category_pages(
             main_page_content.filters["long_date"] = long_date
             main_page_content.filters["date_to_xml_string"] = date_to_xml_string
             main_page_content.filters["archive_date"] = archive_date
+            main_page_content.filters["list_archive_date"] = list_archive_date
 
             main_page_content = main_page_content.from_string(template_string).render(
                 page=page,
@@ -346,7 +283,16 @@ def create_list_pages(base_dir, site_config, output, pages_created_count):
     """
     Creates pages for specified groups (i.e. "likes").
     """
-    list_pages = ["likes", "bookmarks", "replies", "notes"]
+    list_pages = [
+        "likes",
+        "bookmarks",
+        "replies",
+        "notes",
+        "flights",
+        "events",
+        "checkins",
+        "photos",
+    ]
 
     for page in list_pages:
         number_of_pages = int(len(site_config[page]) / 10) + 1
@@ -359,15 +305,16 @@ def create_list_pages(base_dir, site_config, output, pages_created_count):
                 "total_pages": number_of_pages,
                 "previous_page": increment - 1,
                 "next_page": increment + 1,
-                "previous_page_path": "/" + page + "/" + str(increment - 1),
-                "next_page_path": "/" + page + "/" + str(increment + 1),
+                "previous_page_path": "/" + page + "/" + str(increment - 1) + "/",
+                "next_page_path": "/" + page + "/" + str(increment + 1) + "/",
+                "current_page": increment + 1
             }
 
             if increment - 1 <= 0:
                 paginator["previous_page_path"] = "/" + page + "/"
             else:
                 paginator["previous_page_path"] = (
-                    "/" + page + "/" + str(increment - 1) + ".html"
+                    "/" + page + "/" + str(increment - 1) + "/"
                 )
 
             posts = site_config[page][increment * 10 : increment * 10 + 10]
@@ -391,18 +338,6 @@ def create_list_pages(base_dir, site_config, output, pages_created_count):
             )
 
             pages_created_count += 1
-
-    template = create_template(
-        base_dir + "/templates/all_likes.html",
-        page={"posts": site_config["likes"], "url": "/likes/all/"},
-        site=site_config,
-        paginator=paginator,
-    )
-
-    print(f"Generating {page} Archive Page")
-
-    with open("_site/likes/all/index.html", "w+") as file:
-        file.write(template)
 
     return site_config, pages_created_count
 
@@ -428,19 +363,19 @@ def create_date_archive_pages(site_config, output, pages_created_count, posts):
 
         date = f"{year}/{month}-{day}"
 
-        if all_posts.get(f"{year}-{month}-{day}") == None:
+        if all_posts.get(f"{year}-{month}-{day}") is None:
             all_posts[f"{year}-{month}-{day}"] = [post]
         else:
             all_posts[f"{year}-{month}-{day}"] = all_posts[f"{year}-{month}-{day}"] + [
                 post
             ]
 
-        if all_posts.get(f"{year}-{month}") == None:
+        if all_posts.get(f"{year}-{month}") is None:
             all_posts[f"{year}-{month}"] = [post]
         else:
             all_posts[f"{year}-{month}"] = all_posts[f"{year}-{month}"] + [post]
 
-        if all_posts.get(year) == None:
+        if all_posts.get(year) is None:
             all_posts[year] = [post]
         else:
             all_posts[year] = all_posts[year] + [post]
@@ -489,10 +424,10 @@ def create_date_archive_pages(site_config, output, pages_created_count, posts):
 
             month_object = {"written": written_month, "numeric": month}
 
-            if year_month_combinations.get(year + "-" + month) == None:
+            if year_month_combinations.get(year + "-" + month) is None:
                 year_month_combinations[year + "-" + month] = [date]
 
-                if archive_object["years"].get(year) == None:
+                if archive_object["years"].get(year) is None:
                     archive_object["years"][year] = [month_object]
                 else:
                     archive_object["years"][year] = archive_object["years"][year] + [
@@ -500,8 +435,6 @@ def create_date_archive_pages(site_config, output, pages_created_count, posts):
                     ]
 
     print("Generating Archive Page at /archive/")
-
-    print(archive_object["years"].keys())
 
     if os.path.exists("templates/archive.html"):
         rendered_string = create_template(

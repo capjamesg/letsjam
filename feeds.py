@@ -88,7 +88,7 @@ def create_feeds(site_config, posts):
 
                 image = retrieve_image(post, site_config)
 
-                if image != None:
+                if image is not None:
                     entry["image"] = image
 
                 if post.get("like-of"):
@@ -106,7 +106,7 @@ def create_feeds(site_config, posts):
                 # show reply context in feed item
                 if (
                     post.get("context")
-                    and context_url != None
+                    and context_url is not None
                     and post["context"].get("post_body")
                 ):
                     context = post.get("context")
@@ -181,7 +181,7 @@ def create_feeds(site_config, posts):
 
                 image = retrieve_image(post, site_config)
 
-                if image != None:
+                if image is not None:
                     entry["image"] = image
 
                 if post.get("categories"):
@@ -239,7 +239,7 @@ def create_feeds(site_config, posts):
 
                 image = retrieve_image(post, site_config)
 
-                if image != None:
+                if image is not None:
                     feed_entry.enclosure(image, 0, "image/jpeg")
 
                 feed_entry.content(post["content"])

@@ -1,25 +1,44 @@
 import concurrent.futures
-# import cProfile
 import datetime
 import json
 import os
-import re
 import shutil
-import sys
 
 import frontmatter
 import jinja2
 import markdown
+import requests
 import yaml
 from bs4 import BeautifulSoup
 
 import create_archives
-import feeds
-from config import ALLOWED_SLUG_CHARS, BASE_DIR, OUTPUT
+import to_kml
+
+BASE_DIR = "."
+OUTPUT = "_site"
+ALLOWED_SLUG_CHARS = ["-", "/", ".", "_"]
 
 start_time = datetime.datetime.now()
 
 post_directory = "_posts"
+
+
+def get_published_date(url, post_type, published):
+    published = ""
+
+    if post_type == "article":
+        if url.count("-") > 2 and url.split("-")[1].isnumeric():
+            year, month, day = url.split("-")[:3]
+
+            published = f"{year}-{month}-{day} 00:00:00-00:00"
+
+    try:
+        formatted_date = datetime.datetime.strptime(published, "%Y-%m-%d %H:%M:%S%z")
+    except:
+        formatted_date = ""
+
+    return formatted_date
+
 
 # remove _site dir and all files in it
 shutil.rmtree("_site", ignore_errors=True)
@@ -51,15 +70,15 @@ def create_non_post_files(all_directories, pages_created_count, site_config):
 
     for directory in all_directories:
         if directory == "templates":
-            composite_stream = [
-                post
-                for post in site_config["notes"]
-                if "Activity" not in post["categories"]
-                and "Eat" not in post["categories"]
-            ] + site_config["posts"]
+            composite_stream = site_config["posts"]
 
             # order composite stream
             composite_stream.sort(key=lambda x: x["full_date"], reverse=True)
+
+            # ignore all pages with hidden: true
+            composite_stream = [
+                x for x in composite_stream if x.get("hidden", "") != "true"
+            ]
 
             site_config["stream"] = composite_stream
 
@@ -75,31 +94,54 @@ def create_non_post_files(all_directories, pages_created_count, site_config):
 
         all_files = os.listdir(directory_name)
 
+        # if poll, list all recursive too
+        if directory == "_poll":
+            all_files = []
+
+            files = os.listdir(directory_name)
+
+            for f in files:
+                if os.path.isdir(directory_name + "/" + f):
+                    for file in os.listdir(directory_name + "/" + f):
+                        all_files.append(f + "/" + file + "/index.md")
+
+        categories = [site for site in site_config["categories"].keys()]
+
+        # order alphabetically, ignore case
+        categories = sorted(categories, key=lambda s: s.lower())
+
+        all_categories = []
+
+        for c in categories:
+            all_categories.append(
+                {"name": c, "post_count": len(site_config["categories"][c])}
+            )
+
+        tags = [site for site in site_config["tags"].keys()]
+
+        # order alphabetically
+        tags = sorted(tags, key=lambda s: s.lower())
+
+        all_tags = []
+
+        for c in tags:
+            all_tags.append({"name": c, "post_count": len(site_config["tags"][c])})
+
         for file in sorted(
             all_files, key=lambda s: "".join([char for char in s if char.isnumeric()])
         ):
             f = directory_name + "/" + file
 
-            if os.path.isdir(f):
-                continue
-
             file_name = f.replace(directory_name, "")
 
-            # do not copy dotfiles into site
-            # also do not create archive.html file as that is created later
-
-            if file_name.startswith("."):
+            if (
+                os.path.isdir(f)
+                or file_name.startswith(".")
+                or file_name == "/archive.html"
+            ):
                 continue
 
             extension = file_name.split(".")[-1]
-
-            # the archive page is created separately in the create_archive files
-            if file_name == "/archive.html":
-                continue
-
-            # replies should allow person tagging
-            # this feature only works if the generator can distinguish webmention pages from other pages
-            # else, the generator will add a person tagging section to every page, which is not intended
 
             dir_name = directory_name.replace("./", "")
 
@@ -109,7 +151,13 @@ def create_non_post_files(all_directories, pages_created_count, site_config):
                 page_type = None
 
             if extension in ("md", "html") and not os.path.isdir(f):
-                process_page(directory_name, f, site_config, page_type=page_type)
+                process_page(
+                    f,
+                    site_config,
+                    page_type=page_type,
+                    categories=all_categories,
+                    tags=all_tags,
+                )
             elif extension not in ("py", "pyc", "cfg") and not os.path.isdir(f):
                 shutil.copy(f, OUTPUT + "/" + file_name)
 
@@ -138,94 +186,17 @@ def create_template(path, **kwargs):
     template.filters["long_date"] = create_archives.long_date
     template.filters["date_to_xml_string"] = create_archives.date_to_xml_string
     template.filters["archive_date"] = create_archives.archive_date
-
-    # example markup for person tags
-    # @jamesg.blog
-
-    # example tag
-    # {
-    #     "jamesg.blog": {
-    #         "full_name": "James' Coffee Blog",
-    #         "url": "https://jamesg.blog"
-    #     }
-    # }
-
-    if (
-        "person_tags" in kwargs.keys()
-        and "page_type" in kwargs.keys()
-        and (kwargs["page_type"] == "post")
-    ):
-
-        person_tags = []
-
-        for w in template_front_matter.content.split():
-            w = w.lower()
-            # don't get single @ characters that are alone
-            if w.startswith("@") and w.strip() != "@":
-                # ignore 's in the name
-                w = w.split("'")[0]
-
-                check_for_tag = kwargs["person_tags"].get(w.replace("@", ""), {})
-
-                if check_for_tag == {}:
-                    if "[" in w and "]" in w:
-                        name = w.split("[")[-1].split("]")[0]
-                    else:
-                        name = w.replace("@", "")
-
-                    template_front_matter.content = (
-                        template_front_matter.content.replace(
-                            w, f"[{name}](https://{w.replace('@', '')})"
-                        )
-                    )
-
-                    person_tags.append(f"[{name}](https://{w.replace('@', '')})")
-                elif "." in w:
-                    # only run if . is in the tag, indicating a url
-
-                    # replace @ mention with full name and anchor to url
-                    template_front_matter.content = template_front_matter.content.replace(
-                        w,
-                        f"[{check_for_tag.get('full_name', w.replace('@', ''))}](https://{w.replace('@', '')})",
-                    )
-
-                    if check_for_tag.get("favicon"):
-                        tag = "<p><a href='https://{}'><img src='{}' alt='{}' height='32' width='32' class='profile_tag'>  {}</a></p>".format(
-                            check_for_tag.get("url", w),
-                            check_for_tag.get("favicon", ""),
-                            w.replace("@", ""),
-                            check_for_tag.get("full_name", w.replace("@", "")),
-                        )
-                    else:
-                        tag = f"[{check_for_tag.get('full_name', w.replace('@', ''))}]({check_for_tag.get('url')})"
-
-                    person_tags.append(tag)
-
-        person_tags = list(set(person_tags))
-
-        if len(person_tags) > 0:
-            template_front_matter.content = (
-                template_front_matter.content
-                + "\n\n## Mentioned in this post 👤\n\n"
-                + "".join(person_tags)
-            )
+    template.filters["list_archive_date"] = create_archives.list_archive_date
 
     if path.endswith(".md"):
         template_front_matter.content = markdown.markdown(template_front_matter.content)
 
-    # don't look for person tags in higher-level html files (i.e. main templates)
-    if "page_type" in kwargs.keys():
-        del kwargs["page_type"]
-
     new_template = template.from_string(template_front_matter.content)
 
-    if (
-        len(sys.argv) > 1
-        and sys.argv[1] == "--retro"
-        and template_front_matter.metadata.get("layout")
-        and template_front_matter.metadata["layout"] == "default"
-    ):
-        template_front_matter.metadata["layout"] = "retro"
+    kwargs.get("page", {})["today"] = str(datetime.datetime.now().strftime("%Y%m%d"))
+
+    if kwargs.get("end_date"):
+        kwargs["page"]["end_date_formatted"] = kwargs["end_date"].strftime("%Y-%m-%d")
 
     if template_front_matter.metadata.get("layout"):
         if type(kwargs["site"]) == dict:
@@ -235,19 +206,11 @@ def create_template(path, **kwargs):
                 ]
             )
         else:
-            parent_front_matter = frontmatter.load(
+            parent_front_matter = frontmatter.loads(
                 "_layouts/" + template_front_matter.metadata["layout"] + ".html"
             )
 
         parent_template = template.from_string(parent_front_matter.content)
-
-        if (
-            len(sys.argv) > 1
-            and sys.argv[1] == "--retro"
-            and parent_front_matter.metadata.get("layout")
-            and parent_front_matter.metadata["layout"] == "default"
-        ):
-            parent_front_matter.metadata["layout"] = "retro"
 
         new_template = parent_template.render(
             content=new_template.render(kwargs), **kwargs
@@ -264,27 +227,10 @@ def create_template(path, **kwargs):
     else:
         template = new_template.render(kwargs)
 
-    if len(sys.argv) > 1 and sys.argv[1] == "--retro":
-        template = template.replace(
-            '<div id="main">', '<div id="main" class="flex_right_home">'
-        )
-
-    # soup = BeautifulSoup(template, "html.parser")
-
-    # all links
-    # all_links = soup.find_all("a")
-
-    # with open("all_links.json", "a+") as f:
-    #     for link in all_links:
-    #         if link.get("href") and "//" in link.get("href") and "jamesg.blog" not in link.get("href") and not link.get("href").startswith("/"):
-    #             classes = link.get("class")
-    #             f.write(json.dumps({"dst": link.get("href"), "src": "https://jamesg.blog", "classes": classes}) + "\n")
-
     return template
 
 
 def process_page(
-    directory_name,
     file_name,
     site_config,
     page_type=None,
@@ -292,6 +238,8 @@ def process_page(
     next_post=None,
     next_post_url=None,
     person_tags={},
+    categories=[],
+    tags=[],
 ):
 
     front_matter = frontmatter.load(file_name)
@@ -316,15 +264,7 @@ def process_page(
     if front_matter.metadata == {}:
         return site_config
 
-    # do not process pages with no content
-    if len(front_matter.content) == 0:
-        return site_config
-
-    front_matter.metadata["photo_grid"] = "false"
-    front_matter.metadata["all_images"] = []
-
-    if front_matter.metadata.get("categories") is None:
-        front_matter.metadata["categories"] = []
+    front_matter.metadata["categories"] = front_matter.metadata.get("categories", [])
 
     if type(front_matter.metadata["categories"]) == str:
         front_matter.metadata["categories"] = [
@@ -335,24 +275,12 @@ def process_page(
             "categories"
         ] + front_matter.metadata.get("category", [])
 
-    if front_matter.metadata.get("ate"):
-        front_matter.metadata["categories"] = front_matter.metadata["categories"] + [
-            "Eat"
-        ]
-
     if file_name.endswith(".md"):
         front_matter.content = markdown.markdown(front_matter.content)
 
     soup = BeautifulSoup(front_matter.content, "lxml")
 
-    as_text = soup.get_text()
-
     images = soup.find_all("img")
-
-    if images:
-        front_matter.metadata["image"] = [images[0].get("src", "")]
-
-        front_matter.metadata["all_images"] = images
 
     # first paragraph sentences will be considered "excerpt" value
 
@@ -364,19 +292,23 @@ def process_page(
     ).replace(" @", "")
 
     # use first sentence for meta description
-    front_matter.metadata["meta_description"] = (
-        "".join(front_matter.metadata["excerpt"].split(". ")[0]).replace(" @", "")
-        + "..."
-    )
-    front_matter.metadata["description"] = " ".join(
-        [sentence.text for sentence in soup.find_all("p")[:1]]
-    ).replace(" @", "")
+    if front_matter.metadata.get("meta_description") is None:
+        front_matter.metadata["meta_description"] = (
+            "".join(front_matter.metadata["excerpt"].split(". ")[0]).replace(" @", "")
+            + "..."
+        )
 
-    layout_types = ["like", "bookmark", "repost", "webmention", "note", "watche"]
+    if front_matter.metadata.get("description") is None:
+        front_matter.metadata["description"] = " ".join(
+            [sentence.text for sentence in soup.find_all("p")[:1]]
+        ).replace(" @", "")
 
-    if front_matter.metadata["layout"].rstrip("s").lower() in layout_types:
-        site_config[front_matter.metadata["layout"].rstrip("s")] = site_config[
-            front_matter.metadata["layout"].rstrip("s")
+    if not front_matter.metadata.get("layout"):
+        return
+
+    if site_config.get(front_matter.metadata["layout"]) is not None:
+        site_config[front_matter.metadata["layout"]] = site_config[
+            front_matter.metadata["layout"]
         ] + [front_matter.metadata]
 
     print("Generating " + file_name)
@@ -388,38 +320,17 @@ def process_page(
         title = front_matter.metadata["categories"][-1]
 
         front_matter.metadata["title"] = title.replace("-", " ").title()
-    elif not front_matter.metadata.get("title"):
-        front_matter.metadata["title"] = "Post by James"
 
     if type(front_matter.metadata.get("categories", [])) == list:
         front_matter.metadata["categories"] = front_matter.metadata.get(
             "categories", []
         ) + front_matter.metadata.get("category", [])
 
-    if "note" in front_matter.metadata["categories"]:
-        hashtags = re.findall(r"#(\w+)", as_text)
-
-        for h in hashtags:
-            front_matter.content = front_matter.content.replace(
-                "#" + h, "<a href='/tag/" + h.lower() + "' rel='tag'>#" + h + "</a>"
-            )
-
-        hashtags = [tag.lower() for tag in hashtags]
-
-        if len(hashtags) > 0:
-            front_matter.metadata["tags"] = (
-                front_matter.metadata.get("tags", []) + hashtags
-            )
-
-        for tag in front_matter.metadata.get("tags", []):
-            if site_config["tags"].get(tag) is None:
-                site_config["tags"][tag] = [front_matter.metadata]
-            else:
-                site_config["tags"][tag] = site_config["tags"][tag] + [
-                    front_matter.metadata
-                ]
-
-    if page_type == "post" or "note" in front_matter.metadata["categories"]:
+    if (
+        page_type == "post"
+        or "note" in front_matter.metadata["categories"]
+        or page_type == "poll"
+    ):
         path_to_save = OUTPUT + "/" + file_name.replace(BASE_DIR, "").strip("/")
 
         file = file_name.split("/")[-1]
@@ -443,20 +354,10 @@ def process_page(
             year + "-" + month + "-" + day, "%Y-%m-%d"
         )
 
-        # if more than two image in a post, create grid
-        if len(images) > 2:
-            front_matter.metadata["photo_grid"] = "true"
-
-            # delete all images from main body
-
-            for image in images:
-                front_matter.content = front_matter.content.replace(str(image), "")
-
-            front_matter.metadata["content"] = front_matter.content
-
         if page_type == "post":
-            if not os.path.exists(OUTPUT + "/" + year + "/" + month + "/" + day):
-                os.makedirs(OUTPUT + "/" + year + "/" + month + "/" + day)
+            dir_name = OUTPUT + "/" + year + "/" + month + "/" + day
+            if not os.path.exists(dir_name):
+                os.makedirs(dir_name)
 
             path_to_save = (
                 OUTPUT
@@ -520,7 +421,7 @@ def process_page(
     else:
         post_type = "post"
 
-    published_date = feeds.get_published_date(
+    published_date = get_published_date(
         file_name.split("/")[-1],
         post_type=post_type,
         published=front_matter.metadata.get("published", ""),
@@ -528,20 +429,16 @@ def process_page(
 
     if published_date == "" and front_matter.metadata.get("published"):
         if isinstance(front_matter.metadata["published"], datetime.datetime):
-            front_matter.metadata["full_date"] = front_matter.metadata[
-                "published"
-            ].strftime("%Y-%m-%d %H:%M:%S-00:00")
-            front_matter.metadata["published"] = front_matter.metadata[
-                "published"
-            ].strftime("%B %d, %Y")
+            date_object = front_matter.metadata["published"]
         else:
-            front_matter.metadata["full_date"] = datetime.datetime.strptime(
+            date_object = datetime.datetime.strptime(
                 front_matter.metadata["published"], "%Y-%m-%dT%H:%M:%S.%f"
-            ).strftime("%Y-%m-%d %H:%M:%S-00:00")
-            front_matter.metadata["published"] = datetime.datetime.strptime(
-                front_matter.metadata["published"], "%Y-%m-%dT%H:%M:%S.%f"
-            ).strftime("%B %d, %Y")
+            )
 
+        front_matter.metadata["full_date"] = date_object.strftime(
+            "%Y-%m-%d %H:%M:%S-00:00"
+        )
+        front_matter.metadata["published"] = date_object.strftime("%B %d, %Y")
     else:
         if isinstance(published_date, datetime.datetime):
             front_matter.metadata["published"] = published_date.strftime("%B %d, %Y")
@@ -554,12 +451,16 @@ def process_page(
 
     front_matter.metadata["content"] = front_matter.content
 
-    front_matter.metadata["created_on"] = datetime.datetime.fromtimestamp(
-        os.stat(file_name).st_ctime
-    ).strftime("%B %d, %Y")
-    front_matter.metadata["modified_on"] = datetime.datetime.fromtimestamp(
-        os.stat(file_name).st_mtime
-    ).strftime("%B %d, %Y")
+    page_tags = [
+        "<a href='/tag/" + tag.lower().replace(" ", "-") + "/'>" + tag + "</a>, "
+        for tag in front_matter.metadata.get("tags", [])
+    ]
+
+    # get rid of last ,
+    if len(page_tags) > 0:
+        page_tags[-1] = page_tags[-1].replace("</a>, ", "</a>")
+
+    front_matter.metadata["page_tags"] = "".join(page_tags)
 
     rendered_string = create_template(
         file_name,
@@ -568,7 +469,20 @@ def process_page(
         paginator=None,
         person_tags=person_tags,
         page_type=page_type,
+        categories=categories,
+        tags=tags,
     )
+
+    if post_type == "article" and front_matter.metadata.get("hidden") != "true":
+        for image in images:
+            site_config["photos"] = site_config["photos"] + [
+                {
+                    "alt": image["alt"],
+                    "src": image["src"],
+                    "page_url": url,
+                    "published": front_matter.metadata["full_date"],
+                }
+            ]
 
     dir_to_save = "/".join(path_to_save.split("/")[:-1])
 
@@ -578,16 +492,10 @@ def process_page(
     with open(path_to_save, "w+") as file:
         file.write(rendered_string)
 
-    if site_config and site_config.get("pages"):
-        site_config["pages"] = site_config["pages"] + [front_matter.metadata["url"]]
-    elif site_config:
-        site_config["pages"] = [front_matter.metadata["url"]]
+    site_config["pages"] +=  [front_matter.metadata["url"]]
 
     if page_type == "post" or "note" in front_matter.metadata["categories"]:
-        site_config["posts"] = site_config["posts"] + [front_matter.metadata]
-
-        if type(front_matter.metadata["categories"]) == str:
-            front_matter.metadata["categories"] = [front_matter.metadata["categories"]]
+        site_config["posts"] += [front_matter.metadata]
 
         for category in front_matter.metadata["categories"]:
             if "(Series)" in category:
@@ -598,39 +506,16 @@ def process_page(
                         front_matter.metadata["url"],
                     ]
                 )
+            
+            site_config["categories"][category] = site_config["categories"].get(category, [])  + [front_matter.metadata]
 
-            if (
-                "<img" in front_matter.content
-                and "note" in front_matter.metadata["categories"]
-            ):
-                site_config["notes_with_images"] = site_config["notes_with_images"] + [
-                    front_matter.metadata["url"]
-                ]
-
-            if site_config["categories"].get(category) is None:
-                site_config["categories"][category] = [front_matter.metadata]
-            else:
-                site_config["categories"][category] = site_config["categories"][
-                    category
-                ] + [front_matter.metadata]
-
-    groups = (
-        ("Like", "likes"),
-        ("Bookmark", "bookmarks"),
-        ("Reply", "replies"),
-        ("Repost", "reposts"),
-        ("Watch", "watches"),
-        ("Note", "notes"),
-    )
-
-    for g in groups:
-        lower_categories = [
-            category.lower() for category in front_matter.metadata["categories"]
+    for tag in front_matter.metadata.get("tags", []):
+        site_config["tags"][tag] = site_config["tags"].get(tag.lower(), []) + [
+            front_matter.metadata
         ]
-        if g[0].lower() in lower_categories:
-            site_config[g[1]] = site_config[g[1]] + [front_matter.metadata]
-        elif g[1].rstrip("s") in directory_name:
-            site_config[g[1]] = site_config[g[1]] + [front_matter.metadata]
+
+    for c in front_matter.metadata["categories"]:
+        site_config[c.lower()] = site_config.get(c.lower(), []) + [front_matter.metadata]
 
     return site_config, front_matter
 
@@ -669,7 +554,6 @@ def create_posts(pages_created_count, site_config):
             tasks.append(
                 executor.submit(
                     process_page,
-                    post_directory,
                     path,
                     site_config,
                     "post",
@@ -687,9 +571,8 @@ def create_posts(pages_created_count, site_config):
     for _ in concurrent.futures.as_completed(tasks):
         try:
             pages_created_count += 1
-            print("s")
         except Exception as exc:
-            print(exc)
+            raise exc
 
     return site_config, pages_created_count
 
@@ -756,17 +639,44 @@ def main():
 
     site_config = yaml.load(open("config.yml", "r"), Loader=yaml.FullLoader)
 
-    site_config["pages"] = []
-    site_config["notes_with_images"] = []
+    cafes = to_kml.transform_cafes_to_string_kml_file()
 
-    site_config["months"] = []
-    site_config["years"] = []
+    all_cafes_excluding_world_travel = []
+    all_cities = []
 
-    site_config["categories"] = {}
-    site_config["tags"] = {}
+    for location, values in cafes.items():
+        if "World" not in location:
+            for v in values:
+                all_cafes_excluding_world_travel.append(v)
+        else:
+            all_cities.append(values)
 
-    site_config["series_posts"] = []
-    site_config["layouts"] = {}
+    site_config["cafes"] = cafes
+    cafe_list = list(cafes.keys())
+
+    site_config["cafes"]["GlobalAll"] = all_cities
+
+    # "World2021" and "World2022" are reserved for my /travel/ maps
+    cafe_list.remove("World2021")
+    cafe_list.remove("World2022")
+    cafe_list.remove("RomeChurches")
+
+    new_items = {
+        "cafe_list": cafe_list,
+        "all_cafes_excluding_world_travel": all_cafes_excluding_world_travel,
+        "pages": [],
+        "notes_with_images": [],
+        "months": [],
+        "years": [],
+        "categories": {},
+        "tags": {},
+        "series_posts": [],
+        "layouts": {},
+        "photos": [],
+        "checkin": [],
+    }
+
+    site_config = {**site_config, **new_items}
 
     if site_config.get("groups"):
         for group in site_config["groups"]:
@@ -783,14 +693,14 @@ def main():
 
     posts = site_config["posts"]
 
+    # sort photos by published
+    sorted(site_config["photos"], key=lambda k: k["published"])
     # get all directories in base folder
     all_directories = os.listdir(BASE_DIR)
 
     site_config["posts"].reverse()
 
     categories = site_config["categories"].keys()
-
-    site_config["notes"] = [n for n in site_config["notes"] if "Activity" not in n]
 
     for category in categories:
         # order by date published in descending order
@@ -803,8 +713,6 @@ def main():
     site_config, pages_created_count = create_non_post_files(
         all_directories, pages_created_count, site_config
     )
-
-    os.mkdir("_site/category")
 
     if site_config.get("auto_generate"):
         if "category" in site_config["auto_generate"]:
@@ -836,7 +744,7 @@ def main():
                     try:
                         pages_created_count += 1
                     except Exception as exc:
-                        print(exc)
+                        raise exc
 
         if "date_archive" in site_config["auto_generate"]:
             (
@@ -853,8 +761,6 @@ def main():
 
     create_archives.generate_sitemap(site_config, OUTPUT)
 
-    feeds.create_feeds(site_config, posts)
-
     if os.path.exists("templates/robots.txt"):
         shutil.copyfile("templates/robots.txt", "_site/robots.txt")
 
@@ -868,7 +774,7 @@ def main():
 
     # generate sparklines
 
-    collections_to_build_sparklines_for = ["posts", "likes", "notes", "bookmarks"]
+    collections_to_build_sparklines_for = ["posts"]
 
     sparklines = ""
 
@@ -907,10 +813,23 @@ def main():
         else:
             url = f"/{c}/"
 
+        get_wiki_sparkline = requests.get(
+            "https://sparkline.jamesg.blog/?username=Jamesg.blog&api_url=https://indieweb.org/wiki/api.php&only_image=true&days=30"
+        )
+
+        if get_wiki_sparkline.status_code == 200:
+            wiki_sparkline_url = get_wiki_sparkline.history[-1].url
+        else:
+            wiki_sparkline_url = ""
+
         sparklines += f"""
         <p><a href="{url}">{number_of_posts} {c.title()}</a> <embed class="light_mode" src="/assets/sparkline.svg?{','.join([str(val) for val in data_points])}"
-        class="sparkline" width=100 height=15 /><embed class="dark_mode" src="/assets/sparkline_dark_mode.svg?{','.join([str(val) for val in data_points])}"
+        class="sparkline" width=100 height=15 /></p>
+        <p><a href="https://indieweb.org/User:Jamesg.blog">IndieWeb Wiki Contributions</a> <embed class="light_mode" src="{wiki_sparkline_url}"
         class="sparkline" width=100 height=15 /></p>"""
+
+        # dark mode sparkline for reference
+        # <embed class="dark_mode" src="/assets/sparkline_dark_mode.svg?{','.join([str(val) for val in data_points])}" class="sparkline" width=100 height=15 />
 
     with open("_site/index.html", "r") as file:
         file_content = file.read()
@@ -919,9 +838,6 @@ def main():
 
     with open("_site/index.html", "w") as file:
         file.write(file_content)
-
-    # move all rsvps to their own permalink
-    shutil.move("_site/category/rsvp/", "_site/rsvp/")
 
     print("Pages generated: " + str(pages_created_count))
 
@@ -935,21 +851,7 @@ def main():
     print("Pages generated per second: " + str(per_second))
 
 
-def slugify(post_path):
-    """
-    Remove special characters from a path name and prepare it for use.
-    """
-    return "".join(
-        [
-            char
-            for char in post_path.replace(" ", "-")
-            if char.isalnum() or char in ALLOWED_SLUG_CHARS
-        ]
-    ).replace(".md", ".html")
-
-
 if __name__ == "__main__":
-    # cProfile.run("main()", filename="profile.txt")
     main()
 
     end_time = datetime.datetime.now()
