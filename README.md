@@ -146,35 +146,6 @@ You can use the favicon to add an image to the "mentioned" section at the bottom
 
 @ mentions are enabled by default and will only be used if you use the mention syntax described above in your blog.
 
-## Feed Support
-
-You can automatically generate three types of feeds using letsjam:
-
-- jf2
-- RSS
-- JSON
-
-Feeds are generated on a per-group basis. Groups are defined in your config.py file.
-
-To create a feed, add a FEEDS variable to your config.py file. The variable should look like this:
-
-FEEDS = [
-    ("bookmarks.jf2", "James' Coffee Blog - Bookmarks", "bookmarks", "jf2")
-]
-
-The variable accepts a list of tuples. Each tuple should contain.
-
-1. The name for the feed file.
-2. The title for the feed.
-3. The name of the group whose entries will be catalogued in the feed.
-4. The type of feed (jf2, rss, or json).
-
-If you try to generate a feed for a group that does not exist, the program will not create a feed.
-
-All feeds have the URL:
-
-/feeds/<feed_name>
-
 ## My Site
 
 My blog, jamesg.blog, runs on letsjam. Here is a screenshot of my site home page, generated with letsjam:
