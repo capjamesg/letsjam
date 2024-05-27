@@ -1,3 +1,6 @@
+> [!IMPORTANT]  
+> letsjam is no longer under development. See [Aurora](https://github.com/capjamesg/aurora) for a faster, Python-based static site generator.
+
 # letsjam
 
 letsjam is a static site generator built with Python and jinja2.
